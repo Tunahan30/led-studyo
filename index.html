@@ -1,0 +1,1409 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12">
+<title>LED Stüdyo</title>
+<style>
+:root{
+  --bg:#0b0d12; --card:#141821; --card2:#1b2030; --line:#272e40; --text:#e9ecf4; --muted:#8b94aa;
+  --accent:#8b6cff; --ok:#34d399; --warn:#fbbf24; --err:#f87171; --r:16px;
+}
+*{box-sizing:border-box}
+html{color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-tap-highlight-color:transparent;min-height:100vh;padding-bottom:calc(76px + env(safe-area-inset-bottom));overflow-x:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+button:disabled{opacity:.35;cursor:default}
+#ambient{position:fixed;left:-20%;right:-20%;top:-25vh;height:60vh;pointer-events:none;opacity:.22;filter:blur(30px);z-index:0;
+  background:radial-gradient(closest-side,rgb(139,108,255),transparent)}
+header{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:12px;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top));
+  background:rgba(11,13,18,.82);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+#orb{width:36px;height:36px;border-radius:50%;flex:none;background:#8b6cff;border:2px solid rgba(255,255,255,.15);box-shadow:0 0 16px 3px rgba(139,108,255,.6)}
+.ht{flex:1;min-width:0}
+.ht b{display:block;font-size:16px;letter-spacing:.2px}
+#status{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#status .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--muted);margin-right:6px;vertical-align:1px}
+#status.on .dot{background:var(--ok)}
+#status.busy .dot{background:var(--warn)}
+.btn{border:1px solid var(--line);background:var(--card2);border-radius:12px;padding:10px 14px;display:inline-flex;align-items:center;justify-content:center;
+  gap:8px;min-height:42px;transition:background .15s,border-color .15s,transform .05s;white-space:nowrap}
+.btn:active:not(:disabled){transform:scale(.97)}
+.btn.primary{background:var(--accent);border-color:transparent;color:#fff;font-weight:600}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--err)}
+.btn.sm{min-height:36px;padding:6px 11px;font-size:13.5px;border-radius:10px}
+.iconbtn{width:42px;height:42px;padding:0;border-radius:50%;flex:none}
+#powerBtn{color:var(--muted)}
+#powerBtn.on{color:var(--ok);border-color:rgba(52,211,153,.45)}
+main{position:relative;z-index:1;max-width:560px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:14px}
+.card h2{font-size:15px;margin:0 0 12px;font-weight:650}
+.muted{color:var(--muted);font-size:13.5px}
+p.muted{margin:10px 0 0}
+.row{display:flex;align-items:center;gap:10px}
+.between{justify-content:space-between}
+.wrap{flex-wrap:wrap}
+.grow{flex:1}
+.tab{display:none}
+.tab.active{display:block}
+nav{position:fixed;bottom:0;left:0;right:0;z-index:10;display:flex;justify-content:center;background:rgba(14,17,24,.94);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav .in{display:flex;width:100%;max-width:560px}
+nav button{flex:1;background:none;border:0;padding:9px 0 8px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11.5px;color:var(--muted)}
+nav button svg{width:22px;height:22px}
+nav button.active{color:var(--text)}
+nav button.active svg{color:var(--accent)}
+label.sl{display:block;margin:14px 0 2px}
+label.sl:first-child{margin-top:0}
+label.sl .row{justify-content:space-between;font-size:13.5px}
+label.sl output{color:var(--muted);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent);height:30px;margin:2px 0}
+input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent);margin:0}
+.wheelbox{position:relative;width:min(300px,78vw);aspect-ratio:1;margin:4px auto 6px;touch-action:none;user-select:none;-webkit-user-select:none}
+.wheelbox canvas{width:100%;height:100%;border-radius:50%;display:block;cursor:crosshair}
+#wheelMark{position:absolute;left:50%;top:50%;width:28px;height:28px;margin:-14px 0 0 -14px;border-radius:50%;border:3px solid #fff;
+  box-shadow:0 0 0 1px rgba(0,0,0,.5),0 2px 8px rgba(0,0,0,.6);pointer-events:none}
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:10px}
+.sw{aspect-ratio:1;border-radius:50%;border:2px solid rgba(255,255,255,.14);padding:0;min-height:36px}
+.sw:active{transform:scale(.92)}
+.anim{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--card2);margin-bottom:10px}
+.anim.playing{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.anim .meta{flex:1;min-width:0}
+.anim .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.anim .acts{display:flex;gap:6px;flex:none}
+.bar{height:8px;border-radius:4px;margin-top:7px}
+.step{display:grid;grid-template-columns:46px 1fr 1fr auto;gap:8px;align-items:end;padding:10px 0;border-bottom:1px solid var(--line)}
+.step:last-child{border-bottom:0}
+.step label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px}
+.step .acts{display:flex;gap:4px}
+input[type=color]{width:46px;height:46px;border:1px solid var(--line);padding:3px;background:#0f131b;border-radius:12px}
+input[type=number],input[type=text],textarea,select{width:100%;background:#0f131b;border:1px solid var(--line);border-radius:10px;padding:9px 10px;min-height:42px}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+textarea{min-height:110px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;resize:vertical}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--card2);border-radius:999px;padding:8px 14px;font-size:14px;min-height:38px}
+.chip.active{background:var(--accent);border-color:transparent;color:#fff}
+.fxgroup{margin:18px 2px 8px;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.fxgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.fx{text-align:left;border:1px solid var(--line);background:var(--card2);border-radius:12px;padding:10px 12px;font-size:13.5px;min-height:46px}
+.fx.active{border-color:var(--accent);background:rgba(139,108,255,.2)}
+#viz{width:100%;height:120px;display:block;border-radius:12px;background:#0f131b}
+.note{border-radius:12px;padding:12px 14px;font-size:13.5px;margin-bottom:14px;border:1px solid}
+.note.warn{border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.08)}
+.note.err{border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.08)}
+#log{font-family:ui-monospace,Consolas,monospace;font-size:12px;height:180px;overflow:auto;background:#0f131b;border-radius:10px;padding:8px 10px;
+  white-space:pre;color:#b8c0d4;margin-top:10px}
+.pal{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+#nowbar{display:none;align-items:center;gap:10px;margin-bottom:14px;padding:8px 8px 8px 14px;border-radius:12px;background:var(--card2);border:1px solid var(--accent);font-size:13.5px}
+#nowbar.show{display:flex}
+#nowbar .eq{display:inline-flex;gap:2px;align-items:flex-end;height:14px}
+#nowbar .eq i{width:3px;background:var(--accent);border-radius:1px;animation:eq 1s infinite ease-in-out}
+#nowbar .eq i:nth-child(2){animation-delay:-.4s}
+#nowbar .eq i:nth-child(3){animation-delay:-.7s}
+@keyframes eq{0%,100%{height:4px}50%{height:14px}}
+#toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));transform:translate(-50%,20px);opacity:0;background:#2a3145;color:#fff;
+  padding:10px 16px;border-radius:12px;font-size:14px;z-index:20;transition:.25s;pointer-events:none;width:max-content;max-width:min(90vw,480px);text-align:center;
+  box-shadow:0 6px 24px rgba(0,0,0,.4)}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+.hidden{display:none!important}
+.sub{font-size:13px;color:var(--muted);margin:16px 0 8px}
+.dots{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap}
+.dots i{width:18px;height:18px;border-radius:50%;border:1px solid rgba(255,255,255,.18)}
+.design{cursor:pointer}
+.design.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.design.sel .nm::after{content:" ✓";color:var(--accent)}
+.pc{display:flex;flex-direction:column;align-items:center;gap:2px}
+.pc button{border:0;background:none;color:var(--muted);font-size:12px;padding:2px 6px;min-height:24px}
+.addc{width:46px;height:46px;border:1px dashed var(--muted);border-radius:12px;background:none;color:var(--muted);font-size:22px;line-height:1}
+.vbox{position:relative;width:100%;aspect-ratio:16/9;background:#0f131b;border-radius:12px;overflow:hidden}
+.vbox video{width:100%;height:100%;object-fit:fill;display:block}
+.vbox .crop{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border:2px dashed rgba(255,255,255,.75);border-radius:6px;pointer-events:none}
+.vbox .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13.5px;text-align:center;padding:16px;background:#0f131b}
+#vSwatch{width:42px;height:42px;border-radius:12px;border:1px solid var(--line);flex:none;background:#0f131b}
+#setBtn.on{color:var(--accent);border-color:var(--accent)}
+ol.help{margin:6px 0 0;padding-left:20px;color:var(--muted);font-size:13.5px}
+ol.help li{margin:3px 0}
+@media (max-width:380px){
+  .step{grid-template-columns:46px 1fr 1fr;}
+  .step .acts{grid-column:1 / -1;justify-content:flex-end}
+}
+</style>
+</head>
+<body>
+<div id="ambient"></div>
+
+<header>
+  <div id="orb" aria-hidden="true"></div>
+  <div class="ht">
+    <b>LED Stüdyo</b>
+    <div id="status"><span class="dot"></span><span id="statusTxt">Bağlı değil</span></div>
+  </div>
+  <button class="btn primary sm" id="connectBtn">Bağlan</button>
+  <button class="btn iconbtn" id="setBtn" title="Ayarlar" aria-label="Ayarlar">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+  </button>
+  <button class="btn iconbtn" id="powerBtn" title="Aç / Kapat" aria-label="Aç / Kapat">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.4 6.6a8 8 0 1 0 11.2 0"/></svg>
+  </button>
+</header>
+
+<main>
+  <div id="support"></div>
+  <div id="nowbar"><span class="eq"><i></i><i></i><i></i></span><span id="nowTxt" class="grow"></span><button class="btn sm" id="nowStop">Durdur</button></div>
+
+  <!-- RENK -->
+  <section class="tab" id="tab-color">
+    <div class="card">
+      <div class="wheelbox" id="wheelBox"><canvas id="wheel"></canvas><div id="wheelMark"></div></div>
+      <label class="sl"><div class="row"><span>Parlaklık</span><output id="masterOut"></output></div>
+        <input type="range" id="master" min="1" max="100"></label>
+    </div>
+    <div class="card">
+      <h2>Hazır renkler</h2>
+      <div class="swatches" id="swatches"></div>
+    </div>
+  </section>
+
+  <!-- ANİMASYON -->
+  <section class="tab" id="tab-anim">
+    <div id="animListView">
+      <div class="card">
+        <label class="sl"><div class="row"><span>Animasyon hızı</span><output id="speedOut"></output></div>
+          <input type="range" id="speed" min="-2" max="2" step="0.05"></label>
+      </div>
+      <div class="row between" style="margin:4px 2px 10px"><b>Animasyonlarım</b><button class="btn sm primary" id="newAnim">+ Yeni animasyon</button></div>
+      <div id="userAnims"></div>
+      <div style="margin:18px 2px 10px"><b>Hazır animasyonlar</b></div>
+      <div id="builtinAnims"></div>
+    </div>
+
+    <div id="editorView" class="hidden">
+      <div class="card">
+        <input type="text" id="edName" placeholder="Animasyon adı" maxlength="40">
+        <div class="bar" id="edBar" style="height:16px;border-radius:8px;margin:14px 0 6px"></div>
+        <div id="edSteps"></div>
+        <button class="btn sm" id="edAdd" style="margin-top:10px">+ Adım ekle</button>
+        <p class="muted"><b>Geçiş:</b> bir önceki renkten bu renge yumuşak geçiş süresi (0 = anında atla). <b>Bekle:</b> bu renkte kalma süresi. Animasyon sona gelince başa döner.</p>
+      </div>
+      <div class="row wrap">
+        <button class="btn" id="edPlay">▶ Dene</button>
+        <span class="grow"></span>
+        <button class="btn ghost" id="edCancel">Vazgeç</button>
+        <button class="btn primary" id="edSave">Kaydet</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MÜZİK -->
+  <section class="tab" id="tab-music">
+    <div class="card">
+      <canvas id="viz"></canvas>
+      <button class="btn primary" id="micBtn" style="width:100%;margin-top:12px">Dinlemeyi başlat</button>
+      <div class="row" style="margin-top:10px">
+        <span class="muted" style="flex:none">Ses kaynağı</span>
+        <select id="srcSel">
+          <option value="mic">Mikrofon</option>
+          <option value="tab">Bilgisayar sesi (ekran paylaşımı)</option>
+        </select>
+      </div>
+    </div>
+    <div id="mListView">
+      <div class="row between" style="margin:4px 2px 10px"><b>Müzik tasarımlarım</b><button class="btn sm primary" id="mNew">+ Yeni tasarım</button></div>
+      <div id="mDesigns"></div>
+    </div>
+
+    <div id="mEditor" class="hidden">
+      <div class="card">
+        <input type="text" id="mdName" placeholder="Tasarım adı (ör. Akşam partisi)" maxlength="40">
+        <div class="sub">Renkler (en fazla 6)</div>
+        <div class="pal" id="mdColors"></div>
+        <div class="sub">Renk ne zaman değişsin?</div>
+        <div class="chips" id="mdChange"></div>
+        <div id="mdTransWrap">
+          <div class="sub">Renk geçişi</div>
+          <div class="chips" id="mdTrans"></div>
+        </div>
+        <label class="sl" id="mdFadeWrap"><div class="row"><span>Geçiş süresi</span><output id="mdFadeOut"></output></div>
+          <input type="range" id="mdFade" min="0.1" max="3" step="0.1"></label>
+        <div class="sub">Parlaklık sese nasıl uysun?</div>
+        <div class="chips" id="mdBright"></div>
+        <div id="mdOrderWrap"><div class="sub">Renk sırası</div><div class="chips" id="mdOrder"></div></div>
+      </div>
+      <div class="row wrap" style="margin-bottom:14px">
+        <button class="btn" id="mdTry">▶ Dene</button>
+        <span class="grow"></span>
+        <button class="btn ghost" id="mdCancel">Vazgeç</button>
+        <button class="btn primary" id="mdSave">Kaydet</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Ses ayarları</h2>
+      <label class="sl"><div class="row"><span>Hassasiyet</span><output id="sensOut"></output></div>
+        <input type="range" id="mSens" min="0.4" max="2.5" step="0.05"></label>
+      <label class="sl"><div class="row"><span>Yumuşaklık</span><output id="smoothOut"></output></div>
+        <input type="range" id="mSmooth" min="0" max="1" step="0.05"></label>
+      <label class="sl"><div class="row"><span>En düşük parlaklık</span><output id="floorOut"></output></div>
+        <input type="range" id="mFloor" min="0" max="0.6" step="0.01"></label>
+    </div>
+    <p class="muted" style="margin:0 4px 14px">İpucu: Mikrofon modunda telefonu TV'nin ya da hoparlörün yanına bırak. Bilgisayarda çalan müzik için "Bilgisayar sesi"ni seç ve paylaşım penceresinde <b>sistem sesini paylaş</b> kutusunu işaretle.</p>
+  </section>
+
+  <!-- GÖRÜNTÜ -->
+  <section class="tab" id="tab-video">
+    <div class="card">
+      <div class="vbox" id="vbox">
+        <video id="camVideo" playsinline muted></video>
+        <div class="crop" id="vCrop"></div>
+        <div class="ph" id="vPh">Başlat'a bas. Telefonu TV'yi görecek şekilde sabitle; şerit ekrandaki renge bürünür.</div>
+      </div>
+      <div class="row" style="margin-top:12px"><span id="vSwatch" title="Şeride giden renk"></span><button class="btn primary grow" id="camBtn">Başlat</button></div>
+      <div class="row" style="margin-top:10px">
+        <span class="muted" style="flex:none">Kaynak</span>
+        <select id="camSrc">
+          <option value="camera">Telefon kamerası</option>
+          <option value="screen">Ekran paylaşımı (bilgisayar)</option>
+        </select>
+      </div>
+    </div>
+    <div class="card">
+      <div class="sub" style="margin-top:0">Renk nasıl seçilsin?</div>
+      <div class="chips" id="vMode"><button class="chip" data-v="vivid">Canlı renk</button><button class="chip" data-v="avg">Ortalama renk</button></div>
+      <label class="sl" style="margin-top:14px"><div class="row"><span>Renk canlılığı</span><output id="vSatOut"></output></div>
+        <input type="range" id="vSat" min="0.5" max="2.5" step="0.1"></label>
+      <label class="sl"><div class="row"><span>Yumuşaklık</span><output id="vSmoothOut"></output></div>
+        <input type="range" id="vSmooth" min="0" max="1" step="0.05"></label>
+      <label class="sl"><div class="row"><span>Görüntü alanı</span><output id="vCropOut"></output></div>
+        <input type="range" id="vCropR" min="0.3" max="1" step="0.05"></label>
+      <label class="row" style="gap:8px;margin-top:12px"><input type="checkbox" id="vFollow"><span class="muted">Parlaklık da görüntüye uysun (karanlık sahnede kısılır)</span></label>
+    </div>
+    <p class="muted" style="margin:0 4px 14px"><b>Canlı renk</b> ekrandaki en belirgin rengi alır, TV ambiyansı için daha güzel durur. <b>Ortalama renk</b> tüm görüntünün ortalamasıdır. Kesikli çerçeve kameranın dikkate aldığı alanı gösterir, TV'yi bu çerçeveye sığdır.</p>
+  </section>
+
+  <!-- EFEKTLER -->
+  <section class="tab" id="tab-fx">
+    <div class="card">
+      <div class="row between"><span>Yön</span>
+        <div class="chips" id="fxDir"><button class="chip" data-dir="1">İleri</button><button class="chip" data-dir="0">Geri</button></div></div>
+      <p class="muted">Bunlar şeridin kendi içindeki hazır efektler (MR STAR'dakilerle aynı). Şerit kendi çalıştırır, telefonun açık kalması gerekmez.</p>
+    </div>
+    <div id="fxList"></div>
+  </section>
+
+  <!-- AYARLAR -->
+  <section class="tab" id="tab-set">
+    <div class="card">
+      <h2>Bağlantı</h2>
+      <div class="muted" id="devInfo">Cihaz seçilmedi.</div>
+      <ol class="help">
+        <li>MR STAR uygulamasını tamamen kapat (şerit aynı anda tek bağlantı kabul eder).</li>
+        <li>Yukarıdaki <b>Bağlan</b>'a bas, listeden <b>GATT--DEMO</b>'yu seç.</li>
+        <li>Listede görünmüyorsa aşağıdaki "Tüm cihazları göster" ile dene.</li>
+      </ol>
+      <div class="row wrap" style="margin-top:12px">
+        <button class="btn sm" id="connectAll">Tüm cihazları göster</button>
+        <button class="btn sm danger" id="disconnectBtn">Bağlantıyı kes</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>İnce ayar</h2>
+      <label class="sl"><div class="row"><span>Komutlar arası bekleme</span><output id="gapOut"></output></div>
+        <input type="range" id="gap" min="10" max="120" step="5"></label>
+      <p class="muted" style="margin-top:0">Animasyonlarda takılma ya da bağlantı kopması olursa bu süreyi artır.</p>
+      <label class="sl"><div class="row"><span>En düşük parlaklık değeri</span><output id="minRawOut"></output></div>
+        <input type="range" id="minRaw" min="0" max="150" step="5"></label>
+      <p class="muted" style="margin-top:0">Şerit çok düşük parlaklıkta sönüyor ya da tuhaf davranıyorsa bu değeri 100'e çıkar.</p>
+    </div>
+    <div class="card">
+      <h2>Ham komut gönder</h2>
+      <div class="row"><input type="text" id="rawHex" placeholder="BC 01 01 00 55" spellcheck="false" autocapitalize="characters"><button class="btn sm" id="rawSend">Gönder</button></div>
+      <label class="row" style="margin-top:12px;gap:8px"><input type="checkbox" id="logOn"><span class="muted">Gönderilen komutları göster</span></label>
+      <div id="log" class="hidden"></div>
+    </div>
+    <div class="card">
+      <h2>Animasyon yedeği</h2>
+      <textarea id="backup" placeholder="Dışa aktar'a bas ya da yedeğini buraya yapıştırıp İçe aktar'a bas" spellcheck="false"></textarea>
+      <div class="row" style="margin-top:10px"><button class="btn sm" id="exportBtn">Dışa aktar</button><button class="btn sm" id="importBtn">İçe aktar</button></div>
+    </div>
+  </section>
+</main>
+
+<nav><div class="in">
+  <button data-tab="color"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.7-1 1.2-1.9-.6-1.1-.1-2.4 1.4-2.4H17a4 4 0 0 0 4-4C21 7.3 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2" fill="currentColor"/><circle cx="10.5" cy="7" r="1.2" fill="currentColor"/><circle cx="15.5" cy="8" r="1.2" fill="currentColor"/></svg>Renk</button>
+  <button data-tab="anim"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M10 9l5 3-5 3z" fill="currentColor"/></svg>Animasyon</button>
+  <button data-tab="music"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5.5l11-2V16"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>Müzik</button>
+  <button data-tab="fx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M11 3l1.8 4.7 4.7 1.8-4.7 1.8L11 16l-1.8-4.7L4.5 9.5l4.7-1.8z"/><path d="M18.5 14.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>Efektler</button>
+  <button data-tab="video"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12.5" rx="2"/><path d="M8.5 20h7M12 16.5V20"/></svg>Görüntü</button>
+</div></nav>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+/* ============================================================
+   Yardımcılar
+   ============================================================ */
+const $ = (s, r = document) => r.querySelector(s);
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hexStr = b => Array.from(b, x => x.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('ledstudyo.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('ledstudyo.' + k, JSON.stringify(v)); } catch {} }
+};
+
+let toastT;
+function toast(msg, ms = 2800) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+/* ---------- renk dönüşümleri ---------- */
+function hexToRgb(hex) { const n = parseInt(hex.replace('#', ''), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function rgbToHex(r, g, b) { return '#' + [r, g, b].map(x => Math.round(clamp(x, 0, 255)).toString(16).padStart(2, '0')).join(''); }
+function rgbToHsv(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  let h = 0;
+  if (d) {
+    if (max === r) h = ((g - b) / d) % 6; else if (max === g) h = (b - r) / d + 2; else h = (r - g) / d + 4;
+    h *= 60; if (h < 0) h += 360;
+  }
+  return [h, max ? d / max : 0, max];
+}
+function hsvToRgb(h, s, v) {
+  h = ((h % 360) + 360) % 360;
+  const c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c;
+  let r, g, b;
+  if (h < 60) [r, g, b] = [c, x, 0]; else if (h < 120) [r, g, b] = [x, c, 0]; else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c]; else if (h < 300) [r, g, b] = [x, 0, c]; else [r, g, b] = [c, 0, x];
+  return [(r + m) * 255, (g + m) * 255, (b + m) * 255];
+}
+const hexToHsv = hex => rgbToHsv(...hexToRgb(hex));
+const hsvHex = (h, s, v) => rgbToHex(...hsvToRgb(h, s, v));
+// HSV uzayında geçiş (ton en kısa yoldan döner; siyah/beyaz uçlar tonu karşı taraftan alır)
+function lerpHsv(a, b, t) {
+  let [h1, s1, v1] = a, [h2, s2, v2] = b;
+  if (v1 < 0.01) { h1 = h2; s1 = s2; } else if (s1 < 0.03) h1 = h2;
+  if (v2 < 0.01) { h2 = h1; s2 = s1; } else if (s2 < 0.03) h2 = h1;
+  const dh = ((h2 - h1 + 540) % 360) - 180;
+  return [(h1 + dh * t + 360) % 360, s1 + (s2 - s1) * t, v1 + (v2 - v1) * t];
+}
+const smoothstep = x => x * x * (3 - 2 * x);
+
+/* ============================================================
+   Ayarlar (tarayıcıda saklanır)
+   ============================================================ */
+const DEF = {
+  master: 80, speed: 0, gap: 30, minRaw: 10, hsv: [275, 0.85, 1], tab: 'color', fxDir: 1,
+  music: { design: 'm-pulse', src: 'mic', sens: 1, smooth: 0.5, floor: 0.05 },
+  video: { src: 'camera', mode: 'vivid', sat: 1.4, smooth: 0.5, crop: 0.7, follow: true }
+};
+const savedS = store.get('settings', {}) || {};
+const S = Object.assign({}, DEF, savedS, {
+  music: Object.assign({}, DEF.music, savedS.music || {}),
+  video: Object.assign({}, DEF.video, savedS.video || {})
+});
+if (!Array.isArray(S.hsv) || S.hsv.length !== 3) S.hsv = DEF.hsv.slice();
+let saveT;
+function save() { clearTimeout(saveT); saveT = setTimeout(() => store.set('settings', S), 300); }
+
+/* ============================================================
+   MR STAR / FINDN Bluetooth protokolü
+   Servis 0xFFF0, yazma karakteristiği 0xFFF3, cihaz adı "GATT--DEMO".
+   Kaynak: github.com/hirotasoshu/ha-findn-led-ble
+   ============================================================ */
+const SVC = 0xfff0, CHR = 0xfff3;
+const P = {
+  on:     ()           => [0xBC, 0x01, 0x01, 0x01, 0x55],
+  off:    ()           => [0xBC, 0x01, 0x01, 0x00, 0x55],
+  // ton 0-359 derece, doygunluk 0-1000
+  color:  (hue, sat)   => [0xBC, 0x04, 0x06, hue >> 8, hue & 255, sat >> 8, sat & 255, 0x00, 0x00, 0x55],
+  // parlaklık 0-1000
+  bright: raw          => [0xBC, 0x05, 0x06, raw >> 8, raw & 255, 0x00, 0x00, 0x00, 0x00, 0x55],
+  effect: code         => [0xBC, 0x06, 0x02, 0x00, code, 0x55],
+  dir:    forward      => [0xBC, 0x07, 0x01, forward ? 1 : 0, 0x55],
+};
+const briRaw = b => Math.round(S.minRaw + (1000 - S.minRaw) * clamp(b, 0, 1));
+
+/* ============================================================
+   Bluetooth bağlantısı + komut kuyruğu
+   Aynı türden bekleyen komutlar birleştirilir (yalnızca en yenisi gider),
+   böylece hızlı animasyonlarda kuyruk asla şişmez.
+   ============================================================ */
+const ble = {
+  device: null, char: null, q: new Map(), busy: false, last: 0, noResp: false, manual: false, logOn: false,
+  get ok() { return !!this.char; },
+
+  async choose(all) {
+    if (!navigator.bluetooth) { toast('Bu tarayıcı Bluetooth desteklemiyor.'); return; }
+    let dev;
+    try {
+      dev = await navigator.bluetooth.requestDevice(all
+        ? { acceptAllDevices: true, optionalServices: [SVC] }
+        : { filters: [{ name: 'GATT--DEMO' }, { namePrefix: 'GATT' }, { services: [SVC] }], optionalServices: [SVC] });
+    } catch (e) {
+      if (e.name === 'NotFoundError') toast('Cihaz seçilmedi. Listede yoksa MR STAR\'ı kapatıp Ayarlar → "Tüm cihazları göster" ile dene.', 5000);
+      else toast('Bluetooth hatası: ' + e.message, 5000);
+      return;
+    }
+    if (this.device && this.device !== dev) { this.manual = true; try { this.device.gatt.disconnect(); } catch {} }
+    this.device = dev; this.manual = false;
+    if (!dev._ledHooked) { dev.addEventListener('gattserverdisconnected', () => this.onDrop(dev)); dev._ledHooked = true; }
+    await this.open(false);
+  },
+
+  async open(silent) {
+    const dev = this.device; if (!dev) return false;
+    setConn('busy', 'Bağlanıyor…');
+    try {
+      const srv = await dev.gatt.connect();
+      const svc = await srv.getPrimaryService(SVC);
+      const ch = await svc.getCharacteristic(CHR);
+      this.char = ch;
+      this.noResp = !!ch.properties.writeWithoutResponse;
+      led.onConnect();
+      setConn('on', 'Bağlı: ' + (dev.name || 'LED'));
+      if (!silent) toast('Bağlandı');
+      return true;
+    } catch (e) {
+      this.char = null;
+      setConn('off', 'Bağlanamadı');
+      if (!silent) toast(e.name === 'NotFoundError'
+        ? 'Bu cihazda FFF0/FFF3 bulunamadı, farklı bir protokol kullanıyor olabilir.'
+        : 'Bağlanamadı: ' + e.message, 5000);
+      try { dev.gatt.disconnect(); } catch {}
+      return false;
+    }
+  },
+
+  async onDrop(dev) {
+    if (dev !== this.device) return;
+    this.char = null; this.q.clear();
+    if (this.manual) { setConn('off', 'Bağlı değil'); return; }
+    setConn('busy', 'Bağlantı koptu, yeniden deneniyor…');
+    for (let i = 0; i < 4; i++) {
+      await sleep(700 * (i + 1));
+      if (this.manual || this.char || dev !== this.device) return;
+      if (await this.open(true)) { toast('Yeniden bağlandı'); return; }
+    }
+    setConn('off', 'Bağlantı koptu');
+    toast('Bağlantı koptu. Tekrar Bağlan\'a bas.');
+  },
+
+  disconnect() {
+    this.manual = true; this.q.clear();
+    try { if (this.device && this.device.gatt.connected) this.device.gatt.disconnect(); } catch {}
+    this.char = null; setConn('off', 'Bağlı değil');
+  },
+
+  send(key, bytes) {
+    if (this.logOn) logCmd(bytes, !this.char);
+    if (!this.char) return;
+    this.q.delete(key); this.q.set(key, bytes);
+    this.pump();
+  },
+
+  async pump() {
+    if (this.busy) return;
+    this.busy = true;
+    try {
+      while (this.q.size && this.char) {
+        const wait = S.gap - (performance.now() - this.last);
+        if (wait > 0) await sleep(wait);
+        const it = this.q.entries().next();
+        if (it.done || !this.char) break;
+        const [k, b] = it.value; this.q.delete(k);
+        const data = new Uint8Array(b);
+        try {
+          if (this.noResp && this.char.writeValueWithoutResponse) await this.char.writeValueWithoutResponse(data);
+          else if (this.char.writeValueWithResponse) await this.char.writeValueWithResponse(data);
+          else await this.char.writeValue(data);
+        } catch (e) { console.warn('BLE yazma hatası', e); }
+        this.last = performance.now();
+      }
+    } finally { this.busy = false; }
+  }
+};
+
+/* ============================================================
+   Şerit durumu: HSV rengi komutlara çevirir, değişmeyen değerleri tekrar göndermez
+   ============================================================ */
+const orb = $('#orb'), amb = $('#ambient');
+let paintKey = '';
+function paint(h, s, b) {
+  const [r, g, bl] = hsvToRgb(h, s, 1).map(x => x | 0);
+  const vis = clamp(b, 0, 1);
+  const [r2, g2, b2] = hsvToRgb(h, s, vis).map(x => x | 0);
+  const key = r2 + ',' + g2 + ',' + b2;
+  if (key === paintKey) return; paintKey = key;
+  orb.style.background = `rgb(${key})`;
+  orb.style.boxShadow = `0 0 ${6 + 26 * vis}px ${1 + 7 * vis}px rgba(${r},${g},${bl},${(0.15 + 0.7 * vis).toFixed(2)})`;
+  amb.style.background = `radial-gradient(closest-side, rgba(${r},${g},${bl},${(0.15 + 0.85 * vis).toFixed(2)}), transparent)`;
+}
+function paintSpecial(kind) {
+  paintKey = '';
+  if (kind === 'off') {
+    orb.style.background = '#1a1d26'; orb.style.boxShadow = 'none'; amb.style.background = 'transparent';
+  } else {
+    orb.style.background = 'conic-gradient(#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)';
+    orb.style.boxShadow = '0 0 22px 4px rgba(255,255,255,.35)';
+    amb.style.background = 'radial-gradient(closest-side, rgba(180,120,255,.9), transparent)';
+  }
+}
+
+const led = {
+  power: true, needOn: true, last: { h: -1, s: -1, b: -1 }, cur: S.hsv.slice(),
+  invalidate() { this.last = { h: -1, s: -1, b: -1 }; },
+  onConnect() { this.needOn = true; this.invalidate(); updPower(); },
+  show(h, s, v) {
+    this.cur = [h, s, v];
+    const b = clamp(v, 0, 1) * S.master / 100;
+    paint(h, s, b);
+    if (this.needOn || !this.power) { this.needOn = false; this.power = true; ble.send('power', P.on()); updPower(); }
+    const hq = Math.round(h) % 360, sq = Math.round(clamp(s, 0, 1) * 1000);
+    // Siyaha yakın renklerde tonu değiştirme: "siyah" = son rengin en düşük parlaklığı
+    if (v > 0.004 || this.last.h < 0) {
+      if (hq !== this.last.h || sq !== this.last.s) { this.last.h = hq; this.last.s = sq; ble.send('color', P.color(hq, sq)); }
+    }
+    const raw = briRaw(b);
+    if (raw !== this.last.b) { this.last.b = raw; ble.send('bri', P.bright(raw)); }
+  },
+  setPower(on) {
+    this.power = on; this.needOn = false;
+    ble.q.delete('color'); ble.q.delete('bri');
+    ble.send('power', on ? P.on() : P.off());
+    if (on) this.invalidate();
+    updPower();
+  }
+};
+function applyManual() { led.invalidate(); led.show(S.hsv[0], S.hsv[1], 1); }
+
+/* ============================================================
+   Oynatma motoru: animasyon / müzik / donanım efekti — aynı anda biri
+   ============================================================ */
+const wake = {
+  lock: null,
+  async on() { try { if ('wakeLock' in navigator && !this.lock) { this.lock = await navigator.wakeLock.request('screen'); this.lock.addEventListener('release', () => { this.lock = null; }); } } catch {} },
+  off() { try { if (this.lock) this.lock.release(); } catch {} this.lock = null; }
+};
+const speedMul = () => Math.pow(2, S.speed);
+
+const engine = {
+  kind: null, fn: null, timer: null, onStop: null, time: 0, lastT: 0,
+  run(kind, label, fn, onStop) {
+    this.stop();
+    this.kind = kind; this.fn = fn; this.onStop = onStop || null;
+    this.time = 0; this.lastT = performance.now();
+    if (fn) { this.timer = setInterval(() => this.tick(), 33); wake.on(); this.tick(); }
+    setNow(label);
+  },
+  tick() {
+    const now = performance.now(), dt = Math.min(0.25, (now - this.lastT) / 1000); this.lastT = now;
+    this.time += dt * (this.kind === 'anim' ? speedMul() : 1);
+    const r = this.fn && this.fn(this.time, dt);
+    if (r) led.show(r[0], r[1], r[2]);
+  },
+  stop() {
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    const cb = this.onStop;
+    this.kind = null; this.fn = null; this.onStop = null;
+    if (cb) cb();
+    wake.off(); setNow(null);
+  }
+};
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && engine.timer) wake.on(); });
+
+/* ============================================================
+   Animasyonlar
+   ============================================================ */
+function stepFn(steps) {
+  const st = steps.map(s => ({ hsv: hexToHsv(s.c), f: Math.max(0, +s.f || 0), h: Math.max(0, +s.h || 0) }));
+  st.forEach(s => { if (s.f + s.h < 0.02) s.h = 0.02; });
+  const n = st.length, total = st.reduce((a, s) => a + s.f + s.h, 0);
+  return t => {
+    if (!n) return null;
+    let x = t % total;
+    for (let i = 0; i < n; i++) {
+      const s = st[i];
+      if (x < s.f) return lerpHsv(st[(i - 1 + n) % n].hsv, s.hsv, smoothstep(x / s.f));
+      x -= s.f;
+      if (x < s.h) return s.hsv;
+      x -= s.h;
+    }
+    return st[n - 1].hsv;
+  };
+}
+function stepsGradient(steps) {
+  if (!steps.length) return '#222';
+  const total = steps.reduce((a, s) => a + Math.max(0, +s.f || 0) + Math.max(0, +s.h || 0), 0) || 1;
+  const stops = [`${steps[steps.length - 1].c} 0%`];
+  let pos = 0;
+  for (const s of steps) {
+    pos += Math.max(0, +s.f || 0); stops.push(`${s.c} ${(pos / total * 100).toFixed(2)}%`);
+    pos += Math.max(0, +s.h || 0); stops.push(`${s.c} ${(pos / total * 100).toFixed(2)}%`);
+  }
+  return `linear-gradient(90deg, ${stops.join(', ')})`;
+}
+const flicker = (h0, h1, sat, vlo, tmin, tmax) => () => {
+  let cur = 1, tgt = 1, next = 0;
+  return t => {
+    if (t >= next) { tgt = vlo + Math.random() * (1 - vlo); next = t + tmin + Math.random() * (tmax - tmin); }
+    cur += (tgt - cur) * 0.35;
+    return [h0 + (h1 - h0) * cur, sat, cur];
+  };
+};
+const mk = arr => arr.map(([c, f, h]) => ({ c, f, h }));
+const BUILTINS = [
+  { id: 'b-rainbow', name: 'Gökkuşağı', desc: 'Tüm renklerde yavaş dönüş', make: () => t => [(t * 36) % 360, 1, 1],
+    bar: 'linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)' },
+  { id: 'b-breath', name: 'Nefes', desc: 'Renk sekmesinde seçtiğin renkle', make: () => t => [S.hsv[0], S.hsv[1], 0.05 + 0.95 * (0.5 - 0.5 * Math.cos(t * Math.PI / 2))],
+    bar: null },
+  { id: 'b-fire', name: 'Ateş', desc: 'Titreyen kırmızı-turuncu alev', make: flicker(4, 28, 1, 0.3, 0.05, 0.14),
+    bar: 'linear-gradient(90deg,#7a0a00,#ff3c00,#ff8a00,#c21800,#ff6a00,#5a0800)' },
+  { id: 'b-candle', name: 'Mum', desc: 'Sıcak, hafif titreşen ışık', make: flicker(24, 34, 0.85, 0.55, 0.08, 0.3),
+    bar: 'linear-gradient(90deg,#b35a12,#ffae4a,#e08a2e,#ffc070,#c66a1a)' },
+  { id: 'b-storm', name: 'Şimşek', desc: 'Lacivert gökyüzünde rastgele çakmalar', make: () => {
+      let next = 1, flash = 0;
+      return t => { if (t >= next) { flash = 1; next = t + (Math.random() < 0.35 ? 0.12 : 1.2 + Math.random() * 4); }
+        const out = flash > 0.12 ? [220, 0.12, flash] : [232, 1, 0.12]; flash *= 0.72; return out; };
+    }, bar: 'linear-gradient(90deg,#0a1030 0 30%,#dfe8ff 31% 33%,#0a1030 34% 70%,#dfe8ff 71% 72%,#0a1030 73%)' },
+  { id: 'b-sunset', name: 'Gün batımı', steps: mk([['#ff4500', 3, 1.5], ['#ff1a66', 3, 1.5], ['#9b30ff', 3, 1.5], ['#ff8c00', 3, 1.5]]) },
+  { id: 'b-ocean', name: 'Okyanus', steps: mk([['#0050ff', 2.5, 1], ['#00d5ff', 2.5, 1], ['#0020a0', 2.5, 1], ['#00ffb0', 2.5, 1]]) },
+  { id: 'b-aurora', name: 'Kuzey ışıkları', steps: mk([['#00ff88', 3, 0.5], ['#00c8ff', 3, 0.5], ['#7a2cff', 3, 0.5], ['#00ff55', 3, 0.5], ['#ff2bd6', 3, 0.5]]) },
+  { id: 'b-heart', name: 'Kalp atışı', steps: mk([['#ff0030', 0.07, 0.05], ['#40000c', 0.15, 0], ['#ff0030', 0.07, 0.05], ['#000000', 0.45, 0.55]]) },
+  { id: 'b-police', name: 'Polis', steps: mk([['#ff0000', 0, 0.12], ['#000000', 0, 0.08], ['#ff0000', 0, 0.12], ['#000000', 0, 0.25],
+                                             ['#0030ff', 0, 0.12], ['#000000', 0, 0.08], ['#0030ff', 0, 0.12], ['#000000', 0, 0.25]]) },
+  { id: 'b-disco', name: 'Disko', steps: mk([['#ff0000', 0, 0.3], ['#00ff00', 0, 0.3], ['#0000ff', 0, 0.3], ['#ffff00', 0, 0.3], ['#ff00ff', 0, 0.3], ['#00ffff', 0, 0.3]]) },
+  { id: 'b-strobe', name: 'Flaş', steps: mk([['#ffffff', 0, 0.06], ['#000000', 0, 0.14]]) },
+];
+let userAnims = store.get('anims', []);
+if (!Array.isArray(userAnims)) userAnims = [];
+let playingId = null;
+
+const ICON_PLAY = '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>';
+const ICON_STOP = '<svg viewBox="0 0 24 24" width="16" height="16"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>';
+
+function playAnim(a) {
+  const fn = a.make ? a.make() : stepFn(a.steps);
+  engine.run('anim', 'Animasyon: ' + a.name, fn, () => { playingId = null; renderAnims(); });
+  playingId = a.id; renderAnims();
+}
+function animCard(a, user) {
+  const bar = a.steps ? stepsGradient(a.steps)
+    : (a.bar || `linear-gradient(90deg,#000,${hsvHex(S.hsv[0], S.hsv[1], 1)},#000)`);
+  const on = playingId === a.id;
+  return `<div class="anim ${on ? 'playing' : ''}" data-id="${esc(a.id)}">
+    <button class="btn iconbtn ${on ? 'primary' : ''}" data-act="play" aria-label="${on ? 'Durdur' : 'Çal'}">${on ? ICON_STOP : ICON_PLAY}</button>
+    <div class="meta"><div class="nm">${esc(a.name)}</div>${a.desc ? `<div class="muted">${esc(a.desc)}</div>` : ''}<div class="bar" style="background:${bar}"></div></div>
+    <div class="acts">${user
+      ? `<button class="btn sm" data-act="edit">Düzenle</button><button class="btn sm danger" data-act="del" aria-label="Sil">✕</button>`
+      : (a.steps ? `<button class="btn sm" data-act="copy">Kopyala</button>` : '')}</div>
+  </div>`;
+}
+function renderAnims() {
+  $('#userAnims').innerHTML = userAnims.length ? userAnims.map(a => animCard(a, true)).join('')
+    : '<div class="muted" style="margin:0 2px 8px">Henüz kendi animasyonun yok. "+ Yeni animasyon" ile renkleri ve süreleri sen seç.</div>';
+  $('#builtinAnims').innerHTML = BUILTINS.map(a => animCard(a, false)).join('');
+}
+function onAnimClick(e) {
+  const btn = e.target.closest('[data-act]'); if (!btn) return;
+  const id = btn.closest('[data-id]').dataset.id;
+  const a = userAnims.find(x => x.id === id) || BUILTINS.find(x => x.id === id);
+  if (!a) return;
+  const act = btn.dataset.act;
+  if (act === 'play') { if (playingId === id) engine.stop(); else playAnim(a); }
+  else if (act === 'edit') openEditor(a);
+  else if (act === 'copy') openEditor({ id: null, name: a.name + ' (kopya)', steps: a.steps });
+  else if (act === 'del') {
+    if (!confirm(`"${a.name}" silinsin mi?`)) return;
+    if (playingId === id) engine.stop();
+    userAnims = userAnims.filter(x => x.id !== id); store.set('anims', userAnims); renderAnims();
+  }
+}
+
+/* ---------- animasyon düzenleyici ---------- */
+let edit = null;
+function openEditor(a) {
+  edit = { id: a ? a.id : null, name: a ? a.name : '', steps: a ? a.steps.map(s => ({ ...s })) : mk([['#ff0050', 1, 1], ['#0080ff', 1, 1], ['#00ff90', 1, 1]]) };
+  $('#animListView').classList.add('hidden'); $('#editorView').classList.remove('hidden');
+  renderEditor(); window.scrollTo({ top: 0 });
+}
+function closeEditor() {
+  if (playingId === '__edit') engine.stop();
+  edit = null;
+  $('#editorView').classList.add('hidden'); $('#animListView').classList.remove('hidden');
+  renderAnims();
+}
+function renderEditor() {
+  $('#edName').value = edit.name;
+  $('#edSteps').innerHTML = edit.steps.map((s, i) => `<div class="step" data-i="${i}">
+      <input type="color" value="${esc(s.c)}" data-k="c" aria-label="${i + 1}. renk">
+      <div><label>Geçiş (sn)</label><input type="number" min="0" max="60" step="0.1" inputmode="decimal" value="${s.f}" data-k="f"></div>
+      <div><label>Bekle (sn)</label><input type="number" min="0" max="60" step="0.1" inputmode="decimal" value="${s.h}" data-k="h"></div>
+      <div class="acts"><button class="btn sm" data-a="up" ${i ? '' : 'disabled'} aria-label="Yukarı taşı">↑</button><button class="btn sm danger" data-a="del" aria-label="Adımı sil" ${edit.steps.length > 1 ? '' : 'disabled'}>✕</button></div>
+    </div>`).join('');
+  edChanged();
+}
+function edChanged() {
+  $('#edBar').style.background = stepsGradient(edit.steps);
+  if (playingId === '__edit' && engine.kind === 'anim') engine.fn = stepFn(edit.steps);
+}
+
+/* ============================================================
+   Müzik modu (Web Audio)
+   ============================================================ */
+/* Müzik tasarımı = renkler + rengin ne zaman değişeceği + geçiş türü + parlaklık davranışı.
+   change: kaç vuruşta bir renk değişir (0 = sürekli akış). trans: 'cut' anında, 'fade' yumuşak geçiş. */
+const MUSIC_BUILTINS = [
+  { id: 'm-pulse', name: 'Nabız', colors: ['#ff0040', '#0070ff', '#00ff7a', '#b026ff'], change: 8, trans: 'fade', fade: 0.8, bright: 'pulse', order: 'seq' },
+  { id: 'm-flash', name: 'Vuruş flaşı', colors: ['#ff0040', '#0070ff', '#00ff7a', '#b026ff', '#ff8a00'], change: 1, trans: 'cut', fade: 0.3, bright: 'flash', order: 'random' },
+  { id: 'm-party', name: 'Parti', colors: ['#ff00c8', '#00e5ff', '#ffe600'], change: 2, trans: 'fade', fade: 0.2, bright: 'pulse', order: 'seq' },
+  { id: 'm-flow', name: 'Sakin akış', colors: ['#2b5cff', '#8a2be2', '#00c2ff'], change: 0, trans: 'fade', fade: 1, bright: 'pulse', order: 'seq' },
+  { id: 'm-spectrum', name: 'Spektrum', algo: 'spectrum', desc: 'Kalın sesler kırmızı-turuncu, ince sesler mavi-mor' },
+  { id: 'm-energy', name: 'Enerji', algo: 'energy', desc: 'Sakin müzikte mavi, coştukça kırmızı' },
+  { id: 'm-rainbow', name: 'Ritimli gökkuşağı', algo: 'rainbow', desc: 'Renkler döner, müzik yükseldikçe hızlanır' },
+];
+const CHANGE_OPTS = [[1, 'Her vuruşta'], [2, 'Her 2 vuruşta'], [4, 'Her 4 vuruşta'], [8, 'Her 8 vuruşta'], [0, 'Sürekli akış']];
+const TRANS_OPTS = [['cut', 'Animasyonsuz (anında)'], ['fade', 'Animasyonlu (yumuşak)']];
+const BRIGHT_OPTS = [['pulse', 'Sese göre nabız'], ['flash', 'Vuruşta flaş'], ['steady', 'Sabit']];
+const ORDER_OPTS = [['seq', 'Sırayla'], ['random', 'Rastgele']];
+const optName = (opts, v) => (opts.find(o => o[0] === v) || ['', ''])[1];
+let userDesigns = store.get('designs', []);
+if (!Array.isArray(userDesigns)) userDesigns = [];
+const findDesign = id => userDesigns.find(d => d.id === id) || MUSIC_BUILTINS.find(d => d.id === id);
+let musicDesign = findDesign(S.music.design) || MUSIC_BUILTINS[0];
+function designSummary(d) {
+  if (d.algo) return d.desc;
+  const parts = [optName(CHANGE_OPTS, d.change)];
+  if (d.change !== 0) parts.push(d.trans === 'fade' ? 'animasyonlu' : 'animasyonsuz');
+  parts.push(optName(BRIGHT_OPTS, d.bright).toLowerCase());
+  return parts.join(' · ');
+}
+const audio = {
+  ctx: null, an: null, stream: null, src: null, buf: null,
+  async open(kind) {
+    let stream;
+    if (kind === 'tab') {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) throw new Error('Bu tarayıcı ses paylaşımını desteklemiyor (yalnızca bilgisayarda Chrome/Edge).');
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 1 }, audio: true, systemAudio: 'include' });
+      if (!stream.getAudioTracks().length) {
+        stream.getTracks().forEach(t => t.stop());
+        throw new Error('Ses paylaşılmadı. Paylaşırken "Sistem sesini de paylaş" kutusunu işaretle.');
+      }
+    } else {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('Bu tarayıcı mikrofona erişemiyor.');
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    }
+    this.stream = stream;
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (this.ctx.state === 'suspended') await this.ctx.resume();
+    this.src = this.ctx.createMediaStreamSource(stream);
+    this.an = this.ctx.createAnalyser(); this.an.fftSize = 2048; this.an.smoothingTimeConstant = 0.35;
+    this.src.connect(this.an);
+    this.buf = new Uint8Array(this.an.frequencyBinCount);
+    stream.getAudioTracks()[0].addEventListener('ended', () => { if (engine.kind === 'music') engine.stop(); });
+  },
+  close() {
+    try { if (this.stream) this.stream.getTracks().forEach(t => t.stop()); } catch {}
+    try { if (this.ctx) this.ctx.close(); } catch {}
+    this.ctx = this.an = this.stream = this.src = this.buf = null;
+  }
+};
+
+function makeMusicFn() {
+  const st = { fl: { b: 255, a: 255 }, pk: { b: 0, a: 0 }, env: 0, envA: 0, bassAvg: 0, prevBass: 0, lastBeat: 0, flash: 0,
+               D: null, idx: 0, beats: 0, cur: null, from: null, to: null, tt: 1, pos: 0, hue: 0, energy: 0, acc: 0 };
+  return (t, dt) => {
+    if (!audio.an) return null;
+    const buf = audio.buf; audio.an.getByteFrequencyData(buf);
+    const binHz = audio.ctx.sampleRate / audio.an.fftSize, M = S.music, sens = M.sens;
+    const band = (lo, hi) => {
+      const a = Math.max(1, Math.floor(lo / binHz)), b = Math.min(buf.length - 1, Math.ceil(hi / binHz));
+      let s = 0; for (let i = a; i <= b; i++) s += buf[i]; return s / (b - a + 1);
+    };
+    const bass = band(35, 150), all = band(35, 8000);
+    let num = 0, den = 0; const top = Math.min(buf.length, Math.floor(8000 / binHz));
+    for (let i = 2; i < top; i++) { num += i * binHz * buf[i]; den += buf[i]; }
+    const cent = den ? num / den : 0;
+    // otomatik kazanç: her bant için hareketli taban ve tepe
+    const norm = (k, v) => {
+      const f = st.fl, p = st.pk;
+      f[k] = v < f[k] ? v : f[k] + (v - f[k]) * 0.003;
+      p[k] = v > p[k] ? v : p[k] - (p[k] - f[k]) * 0.006;
+      return clamp((v - f[k]) / Math.max(p[k] - f[k], 18) * sens, 0, 1);
+    };
+    const lb = norm('b', bass), la = norm('a', all);
+    const silent = all < 5;
+    const rel = 0.05 + (1 - M.smooth) * 0.35;
+    const tb = silent ? 0 : lb, ta = silent ? 0 : la;
+    st.env += (tb - st.env) * (tb > st.env ? 0.75 : rel);
+    st.envA += (ta - st.envA) * (ta > st.envA ? 0.6 : rel);
+    // vuruş algılama: bas, son yarım saniyenin ortalamasının belirgin üstüne çıkınca
+    const now = performance.now(); let beat = false;
+    // (yalnızca bas yükselirken: sönen vuruşun kuyruğu ikinci vuruş sayılmasın)
+    if (!silent && bass > 28 && bass >= st.prevBass && bass > st.bassAvg * (1 + 0.3 / sens) && now - st.lastBeat > 200) { beat = true; st.lastBeat = now; }
+    st.bassAvg = st.bassAvg * 0.92 + bass * 0.08;
+    st.prevBass = bass;
+
+    const fl = M.floor, V = x => fl + (1 - fl) * clamp(x, 0, 1);
+    const D = musicDesign;
+    let out;
+    if (D.algo === 'spectrum') {
+      const x = cent ? clamp(Math.log2(cent / 180) / Math.log2(3500 / 180), 0, 1) : 0;
+      st.hue += (x * 280 - st.hue) * 0.12;
+      out = [st.hue, 1, V(Math.max(st.env, st.envA))];
+    } else if (D.algo === 'energy') {
+      st.energy += (ta - st.energy) * 0.03;
+      out = [240 - 240 * clamp(st.energy * 1.3, 0, 1), 1, V(st.env)];
+    } else if (D.algo === 'rainbow') {
+      st.acc = (st.acc + 0.4 + 7 * st.env) % 360;
+      out = [st.acc, 1, V(Math.max(0.25, st.env))];
+    } else {
+      // kullanıcının tasarımı
+      const cols = D.colors.map(hexToHsv), n = cols.length;
+      if (st.D !== D || !st.cur) { st.D = D; st.idx = 0; st.beats = 0; st.pos = 0; st.cur = st.to = cols[0]; st.tt = 1; }
+      st.idx %= n;
+      if (D.change === 0) {
+        // sürekli akış: renkler arasında döner, müzik yükseldikçe hızlanır
+        st.pos = (st.pos + dt * (0.12 + 1.6 * st.envA)) % n;
+        const i = Math.floor(st.pos), f = st.pos - i;
+        st.cur = D.trans === 'fade' ? lerpHsv(cols[i], cols[(i + 1) % n], smoothstep(f)) : cols[i];
+      } else {
+        if (beat && ++st.beats % D.change === 0) {
+          if (D.order === 'random' && n > 1) { let j; do { j = Math.floor(Math.random() * n); } while (j === st.idx); st.idx = j; }
+          else st.idx = (st.idx + 1) % n;
+          if (D.trans === 'fade') { st.from = st.cur; st.to = cols[st.idx]; st.tt = 0; }
+          else st.tt = 1;
+        }
+        if (st.tt < 1) { st.tt = Math.min(1, st.tt + dt / Math.max(0.05, D.fade)); st.cur = lerpHsv(st.from, st.to, smoothstep(st.tt)); }
+        else st.cur = cols[st.idx];
+      }
+      let b;
+      if (D.bright === 'flash') { if (beat) st.flash = 1; else st.flash *= 0.78 + 0.18 * M.smooth; b = V(st.flash); }
+      else if (D.bright === 'steady') b = 1;
+      else b = V(st.env);
+      out = [st.cur[0], st.cur[1], b * st.cur[2]];
+    }
+    drawViz(buf, binHz, out, beat);
+    return out;
+  };
+}
+
+const viz = $('#viz');
+function sizeViz() {
+  const w = viz.clientWidth; if (!w) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  viz.width = Math.round(w * dpr); viz.height = Math.round(120 * dpr);
+  if (engine.kind !== 'music') drawViz(null);
+}
+let beatGlow = 0;
+function drawViz(buf, binHz, hsv, beat) {
+  const c = viz.getContext('2d'), W = viz.width, H = viz.height;
+  c.clearRect(0, 0, W, H);
+  const N = 40, bw = W / N;
+  if (!buf) {
+    c.fillStyle = '#272e40';
+    for (let i = 0; i < N; i++) c.fillRect(i * bw + 1, H - 3, bw - 2, 3);
+    return;
+  }
+  const [r, g, b] = hsvToRgb(hsv[0], hsv[1], 1).map(x => x | 0);
+  beatGlow = beat ? 1 : beatGlow * 0.85;
+  if (beatGlow > 0.05) { c.fillStyle = `rgba(${r},${g},${b},${(beatGlow * 0.18).toFixed(3)})`; c.fillRect(0, 0, W, H); }
+  const lo = Math.log(40), hi = Math.log(10000);
+  c.fillStyle = `rgb(${r},${g},${b})`;
+  for (let i = 0; i < N; i++) {
+    const a = Math.floor(Math.exp(lo + (hi - lo) * i / N) / binHz);
+    const e = Math.max(a, Math.floor(Math.exp(lo + (hi - lo) * (i + 1) / N) / binHz));
+    let m = 0; for (let k = a; k <= e && k < buf.length; k++) m = Math.max(m, buf[k]);
+    const h = Math.max(3, (m / 255) * (H - 6));
+    c.globalAlpha = 0.3 + 0.7 * (m / 255);
+    c.fillRect(i * bw + 1, H - h, bw - 2, h);
+  }
+  c.globalAlpha = 1;
+  // sağ kenarda gönderilen parlaklık
+  c.fillStyle = 'rgba(255,255,255,.85)';
+  c.fillRect(W - 4, H - H * hsv[2], 4, H * hsv[2]);
+}
+
+function micErr(e) {
+  if (e.name === 'NotAllowedError') return 'İzin verilmedi. Tarayıcı ayarlarından mikrofon / ekran paylaşımı iznini aç.';
+  if (e.name === 'NotFoundError') return 'Mikrofon bulunamadı.';
+  return e.message || String(e);
+}
+async function toggleMusic() {
+  if (engine.kind === 'music') { engine.stop(); return; }
+  engine.stop();
+  const btn = $('#micBtn'); btn.disabled = true; btn.textContent = 'İzin bekleniyor…';
+  try { await audio.open(S.music.src); }
+  catch (e) { audio.close(); toast(micErr(e), 5500); updMicBtn(); return; }
+  finally { btn.disabled = false; }
+  engine.run('music', musicLabel(), makeMusicFn(), () => { audio.close(); updMicBtn(); drawViz(null); });
+  updMicBtn();
+}
+const musicLabel = () => 'Müzik: ' + (musicDesign.name || 'Yeni tasarım');
+
+/* ---------- müzik tasarımları listesi ve düzenleyici ---------- */
+function designCard(d, user) {
+  const sel = musicDesign.id === d.id && musicDesign !== dEdit;
+  const look = d.algo
+    ? `<div class="bar" style="background:${d.algo === 'energy' ? 'linear-gradient(90deg,#0040ff,#a000ff,#ff0030)' : 'linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f)'}"></div>`
+    : `<div class="dots">${d.colors.map(c => `<i style="background:${esc(c)}"></i>`).join('')}</div>`;
+  return `<div class="anim design ${sel ? 'sel' : ''}" data-id="${esc(d.id)}" data-act="pick">
+    <div class="meta"><div class="nm">${esc(d.name)}</div><div class="muted">${esc(designSummary(d))}</div>${look}</div>
+    <div class="acts">${user
+      ? `<button class="btn sm" data-act="edit">Düzenle</button><button class="btn sm danger" data-act="del" aria-label="Sil">✕</button>`
+      : (d.algo ? '' : `<button class="btn sm" data-act="copy">Kopyala</button>`)}</div>
+  </div>`;
+}
+function renderDesigns() {
+  $('#mDesigns').innerHTML =
+    (userDesigns.length ? userDesigns.map(d => designCard(d, true)).join('')
+      : '<div class="muted" style="margin:0 2px 10px">"+ Yeni tasarım" ile renklerini seç ve sese nasıl tepki vereceklerini belirle.</div>')
+    + '<div style="margin:16px 2px 10px"><b>Hazır tasarımlar</b></div>'
+    + MUSIC_BUILTINS.map(d => designCard(d, false)).join('');
+}
+function selectDesign(d) {
+  musicDesign = d; S.music.design = d.id; save(); renderDesigns();
+  if (engine.kind === 'music') setNow(musicLabel());
+}
+function onDesignClick(e) {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const id = el.closest('[data-id]').dataset.id, d = findDesign(id); if (!d) return;
+  const act = el.dataset.act;
+  if (act === 'pick') { selectDesign(d); if (engine.kind !== 'music') toggleMusic(); }
+  else if (act === 'edit') openDesignEditor(d);
+  else if (act === 'copy') openDesignEditor(Object.assign({}, d, { id: null, name: d.name + ' (kopya)' }));
+  else if (act === 'del') {
+    if (!confirm(`"${d.name}" silinsin mi?`)) return;
+    userDesigns = userDesigns.filter(x => x.id !== id); store.set('designs', userDesigns);
+    if (musicDesign.id === id) selectDesign(MUSIC_BUILTINS[0]); else renderDesigns();
+  }
+}
+let dEdit = null;
+function openDesignEditor(d) {
+  dEdit = d ? { id: d.id, name: d.name, colors: d.colors.slice(), change: d.change, trans: d.trans, fade: d.fade, bright: d.bright, order: d.order }
+            : { id: null, name: '', colors: ['#ff0040', '#00a0ff', '#ffd000'], change: 1, trans: 'fade', fade: 0.4, bright: 'pulse', order: 'seq' };
+  $('#mListView').classList.add('hidden'); $('#mEditor').classList.remove('hidden');
+  $('#mdName').value = dEdit.name; $('#mdFade').value = dEdit.fade;
+  renderDesignEditor(); window.scrollTo({ top: 0 });
+}
+function closeDesignEditor() {
+  const wasPreview = musicDesign === dEdit;
+  dEdit = null;
+  if (wasPreview) musicDesign = findDesign(S.music.design) || MUSIC_BUILTINS[0];
+  if (engine.kind === 'music') setNow(musicLabel());
+  $('#mEditor').classList.add('hidden'); $('#mListView').classList.remove('hidden');
+  renderDesigns();
+}
+function renderDesignEditor() {
+  const d = dEdit;
+  $('#mdColors').innerHTML = d.colors.map((c, i) => `<div class="pc"><input type="color" value="${esc(c)}" data-i="${i}" aria-label="${i + 1}. renk">
+      <button data-rm="${i}" ${d.colors.length > 1 ? '' : 'disabled'} aria-label="${i + 1}. rengi sil">sil</button></div>`).join('')
+    + (d.colors.length < 6 ? '<button class="addc" id="mdAddColor" aria-label="Renk ekle">+</button>' : '');
+  const chips = (opts, key) => opts.map(([v, n]) => `<button class="chip ${d[key] === v ? 'active' : ''}" data-f="${key}" data-v="${v}">${n}</button>`).join('');
+  $('#mdChange').innerHTML = chips(CHANGE_OPTS, 'change');
+  $('#mdTrans').innerHTML = chips(TRANS_OPTS, 'trans');
+  $('#mdBright').innerHTML = chips(BRIGHT_OPTS, 'bright');
+  $('#mdOrder').innerHTML = chips(ORDER_OPTS, 'order');
+  $('#mdFadeWrap').classList.toggle('hidden', d.trans !== 'fade' || d.change === 0);
+  $('#mdFadeOut').textContent = (+d.fade).toFixed(1) + ' sn';
+  $('#mdOrderWrap').classList.toggle('hidden', d.change === 0);
+}
+function updMicBtn() {
+  const on = engine.kind === 'music', b = $('#micBtn');
+  b.textContent = on ? 'Dinlemeyi durdur' : 'Dinlemeyi başlat';
+  b.classList.toggle('primary', !on);
+}
+
+/* ============================================================
+   Görüntüye göre renk (telefon kamerası ya da bilgisayarda ekran paylaşımı)
+   ============================================================ */
+const cam = {
+  stream: null, cv: null, ctx: null,
+  async open(kind) {
+    const md = navigator.mediaDevices;
+    let stream;
+    if (kind === 'screen') {
+      if (!md || !md.getDisplayMedia) throw new Error('Bu cihazda ekran paylaşımı yok. Telefonda "Telefon kamerası"nı seç.');
+      stream = await md.getDisplayMedia({ video: { frameRate: 15 }, audio: false });
+    } else {
+      if (!md || !md.getUserMedia) throw new Error('Bu tarayıcı kameraya erişemiyor.');
+      stream = await md.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+    }
+    this.stream = stream;
+    const v = $('#camVideo');
+    v.onloadedmetadata = () => { if (v.videoWidth) $('#vbox').style.aspectRatio = v.videoWidth + ' / ' + v.videoHeight; };
+    v.srcObject = stream;
+    try { await v.play(); } catch {}
+    $('#vPh').classList.add('hidden');
+    if (!this.cv) {
+      this.cv = document.createElement('canvas'); this.cv.width = 48; this.cv.height = 27;
+      this.ctx = this.cv.getContext('2d', { willReadFrequently: true });
+    }
+    stream.getVideoTracks()[0].addEventListener('ended', () => { if (engine.kind === 'video') engine.stop(); });
+  },
+  close() {
+    try { if (this.stream) this.stream.getTracks().forEach(t => t.stop()); } catch {}
+    this.stream = null;
+    $('#camVideo').srcObject = null;
+    $('#vPh').classList.remove('hidden');
+    $('#vSwatch').style.background = '';
+  }
+};
+function makeVideoFn() {
+  let cur = null;
+  return () => {
+    const v = $('#camVideo'), V = S.video;
+    if (!cam.stream || v.readyState < 2 || !v.videoWidth) return cur;
+    const W = cam.cv.width, H = cam.cv.height, vw = v.videoWidth, vh = v.videoHeight, cw = vw * V.crop, ch = vh * V.crop;
+    cam.ctx.drawImage(v, (vw - cw) / 2, (vh - ch) / 2, cw, ch, 0, 0, W, H);
+    const d = cam.ctx.getImageData(0, 0, W, H).data;
+    let r = 0, g = 0, b = 0, w = 0, lum = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const R = d[i], G = d[i + 1], B = d[i + 2], mx = Math.max(R, G, B), mn = Math.min(R, G, B);
+      const val = mx / 255, sat = mx ? (mx - mn) / mx : 0;
+      // "Canlı renk": doygun ve parlak pikseller çok daha ağır basar
+      const wt = V.mode === 'vivid' ? (0.03 + sat * sat) * val * val : 1;
+      r += R * wt; g += G * wt; b += B * wt; w += wt; lum += val;
+    }
+    lum /= W * H;
+    if (!w) return cur;
+    const [h, s] = rgbToHsv(r / w, g / w, b / w);
+    const tgt = [h, clamp(s * V.sat, 0, 1), V.follow ? clamp(0.04 + lum * 1.5, 0, 1) : 1];
+    cur = cur ? lerpHsv(cur, tgt, 0.06 + (1 - V.smooth) * 0.6) : tgt;
+    $('#vSwatch').style.background = hsvHex(cur[0], cur[1], Math.max(0.15, cur[2]));
+    return cur;
+  };
+}
+async function toggleVideo() {
+  if (engine.kind === 'video') { engine.stop(); return; }
+  engine.stop();
+  const btn = $('#camBtn'); btn.disabled = true; btn.textContent = 'İzin bekleniyor…';
+  try { await cam.open(S.video.src); }
+  catch (e) {
+    cam.close(); btn.disabled = false; updCamBtn();
+    toast(e.name === 'NotAllowedError' ? 'Kamera / ekran izni verilmedi.' : (e.message || String(e)), 5500);
+    return;
+  }
+  btn.disabled = false;
+  engine.run('video', S.video.src === 'screen' ? 'Görüntü: ekran' : 'Görüntü: kamera', makeVideoFn(), () => { cam.close(); updCamBtn(); });
+  updCamBtn();
+}
+function updCamBtn() {
+  const on = engine.kind === 'video', b = $('#camBtn');
+  b.textContent = on ? 'Durdur' : 'Başlat';
+  b.classList.toggle('primary', !on);
+}
+function updCrop() { const c = $('#vCrop'); c.style.width = c.style.height = (S.video.crop * 100) + '%'; }
+
+/* ============================================================
+   Donanım efektleri (şeridin kendi içindeki 58 efekt)
+   ============================================================ */
+const C7 = ['Kırmızı', 'Yeşil', 'Mavi', 'Sarı', 'Camgöbeği', 'Mor', 'Beyaz'];
+const C7b = ['Kırmızı', 'Yeşil', 'Mavi', 'Camgöbeği', 'Sarı', 'Mor', 'Beyaz'];
+const FX = [
+  ['Genel', [[0x01, 'Otomatik döngü'], [0x02, 'Senfoni'], [0x03, 'Renkli enerji'], [0x04, 'Renkli zıplama'], [0x07, '7 renk flaş'], [0x0A, '7 renk geçiş']]],
+  ['Dalgalanma ve fırça', [[0x1A, 'Renkli dalgalanma'], [0x1B, 'Kırmızı-yeşil-mavi dalgalanma'], [0x1D, 'Renkli fırça'], [0x1E, 'Kırmızı-yeşil-mavi fırça'], [0x1F, 'Sarı-camgöbeği-mor fırça'], [0x20, 'Renkli fırça aç-kapa']]],
+  ['Açılıp kapanma', [[0x23, '7 renk'], [0x24, 'Kırmızı-yeşil-mavi'], [0x25, 'Sarı-camgöbeği-mor'], ...C7.map((n, i) => [0x26 + i, n])]],
+  ['Aydınlık-karanlık', [[0x2D, '7 renk'], [0x2E, 'Mavi-kırmızı-yeşil'], [0x2F, 'Mor-yeşil-sarı'], ...C7b.map((n, i) => [0x30 + i, n])]],
+  ['Akan su', [[0x37, '7 renk'], [0x38, 'Mavi-yeşil-kırmızı'], [0x39, 'Mor-yeşil-sarı'], [0x3A, 'Kırmızı-yeşil'], [0x3B, 'Yeşil-mavi'], [0x3C, 'Sarı-mavi'], [0x3D, 'Sarı-camgöbeği'], [0x3E, 'Mavi-mor']]],
+  ['Kuyruklu', [[0x4C, '7 renk'], ...C7.map((n, i) => [0x4D + i, n])]],
+  ['Koşan', [[0x5B, '7 renk'], [0x5C, 'Mavi-yeşil-kırmızı'], [0x5D, 'Mor-camgöbeği-sarı'], ...C7.map((n, i) => [0x54 + i, n])]],
+];
+let fxActive = null;
+function renderFx() {
+  $('#fxList').innerHTML = FX.map(([g, list]) => `<div class="fxgroup">${g}</div><div class="fxgrid">${
+    list.map(([code, name]) => `<button class="fx ${fxActive === code ? 'active' : ''}" data-code="${code}" data-name="${esc(g + ' · ' + name)}">${esc(name)}</button>`).join('')
+  }</div>`).join('');
+  document.querySelectorAll('#fxDir .chip').forEach(c => c.classList.toggle('active', +c.dataset.dir === S.fxDir));
+}
+function playFx(code, name) {
+  engine.run('fx', 'Efekt: ' + name, null, () => { fxActive = null; led.invalidate(); renderFx(); });
+  fxActive = code; renderFx(); paintSpecial('fx');
+  if (led.needOn || !led.power) led.setPower(true);
+  ble.send('fx', P.effect(code));
+  ble.send('dir', P.dir(S.fxDir));
+}
+
+/* ============================================================
+   Arayüz bağlantıları
+   ============================================================ */
+function setConn(state, text) {
+  const st = $('#status'); st.className = state === 'on' ? 'on' : state === 'busy' ? 'busy' : '';
+  $('#statusTxt').textContent = text;
+  const cb = $('#connectBtn');
+  cb.textContent = state === 'on' ? 'Kes' : 'Bağlan';
+  cb.classList.toggle('primary', state !== 'on');
+  cb.disabled = state === 'busy';
+  $('#devInfo').textContent = ble.device
+    ? `Cihaz: ${ble.device.name || '(adsız)'} · ${state === 'on' ? 'bağlı' : 'bağlı değil'}${state === 'on' ? (ble.noResp ? ' · hızlı yazma' : ' · onaylı yazma') : ''}`
+    : 'Cihaz seçilmedi.';
+}
+function updPower() { $('#powerBtn').classList.toggle('on', led.power && ble.ok); }
+function setNow(label) {
+  $('#nowbar').classList.toggle('show', !!label);
+  $('#nowTxt').textContent = label || '';
+}
+
+/* ---------- log ---------- */
+const logLines = []; let logT = null;
+function logCmd(b, offline) {
+  logLines.push(new Date().toTimeString().slice(0, 8) + '  ' + hexStr(b) + (offline ? '   (bağlı değil)' : ''));
+  if (logLines.length > 100) logLines.shift();
+  if (!logT) logT = setTimeout(() => { logT = null; const el = $('#log'); el.textContent = logLines.join('\n'); el.scrollTop = el.scrollHeight; }, 250);
+}
+
+/* ---------- renk çarkı ---------- */
+const wheel = {
+  cv: $('#wheel'), mark: $('#wheelMark'), box: $('#wheelBox'), drag: false,
+  draw() {
+    const css = this.box.clientWidth; if (!css) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1), N = Math.round(css * dpr);
+    if (this.cv.width !== N) {
+      this.cv.width = this.cv.height = N;
+      const ctx = this.cv.getContext('2d'), img = ctx.createImageData(N, N), d = img.data, r = N / 2;
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        const dx = x + 0.5 - r, dy = y + 0.5 - r, dist = Math.sqrt(dx * dx + dy * dy), i = (y * N + x) * 4;
+        if (dist > r) continue;
+        const [R, G, B] = hsvToRgb((Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360, Math.min(1, dist / r), 1);
+        d[i] = R; d[i + 1] = G; d[i + 2] = B; d[i + 3] = dist > r - 1 ? Math.round(255 * (r - dist)) : 255;
+      }
+      ctx.putImageData(img, 0, 0);
+    }
+    this.place();
+  },
+  place() {
+    const [h, s] = S.hsv, a = h * Math.PI / 180, r = this.box.clientWidth / 2;
+    this.mark.style.left = (r + Math.cos(a) * s * r) + 'px';
+    this.mark.style.top = (r + Math.sin(a) * s * r) + 'px';
+    this.mark.style.background = hsvHex(h, s, 1);
+  },
+  pick(e) {
+    const rect = this.cv.getBoundingClientRect(), r = rect.width / 2;
+    const dx = e.clientX - rect.left - r, dy = e.clientY - rect.top - r;
+    let s = Math.min(1, Math.hypot(dx, dy) / r); if (s < 0.04) s = 0;
+    setManual((Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360, s);
+  }
+};
+function setManual(h, s) {
+  if (engine.kind) engine.stop();
+  S.hsv = [h, s, 1]; wheel.place(); led.show(h, s, 1); save();
+}
+
+/* ---------- sekmeler ---------- */
+function setTab(t) {
+  S.tab = t; save();
+  document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.id === 'tab-' + t));
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
+  $('#setBtn').classList.toggle('on', t === 'set');
+  if (t === 'color') wheel.draw();
+  if (t === 'music') sizeViz();
+  if (t === 'anim') renderAnims();
+}
+
+function bindRange(id, outId, get, set, fmt) {
+  const el = $('#' + id), out = $('#' + outId);
+  el.value = get(); out.textContent = fmt(get());
+  el.addEventListener('input', () => { set(parseFloat(el.value)); out.textContent = fmt(get()); save(); });
+}
+
+function init() {
+  // destek uyarıları
+  let note = '';
+  if (!window.isSecureContext) note = '<div class="note err"><b>Bluetooth ve mikrofon için sayfa https:// üzerinden açılmalı.</b> Bilgisayarda dosyayı doğrudan Chrome/Edge ile açabilirsin.</div>';
+  else if (!navigator.bluetooth) note = '<div class="note warn"><b>Bu tarayıcı Bluetooth desteklemiyor.</b> Android ve bilgisayarda <b>Chrome</b> ya da <b>Edge</b>, iPhone\'da <b>Bluefy</b> tarayıcısını kullan. Şimdilik önizleme modundasın: her şey çalışır ama şeride gönderilmez.</div>';
+  $('#support').innerHTML = note;
+  if (navigator.bluetooth && navigator.bluetooth.getAvailability) {
+    navigator.bluetooth.getAvailability().then(ok => { if (!ok) $('#support').insertAdjacentHTML('beforeend', '<div class="note warn">Bluetooth kapalı görünüyor. Açıp sayfayı yenile.</div>'); }).catch(() => {});
+  }
+
+  // başlık
+  $('#connectBtn').addEventListener('click', () => { if (ble.ok) ble.disconnect(); else ble.choose(false); });
+  $('#powerBtn').addEventListener('click', () => {
+    if (!ble.ok) { toast('Önce şeride bağlan.'); return; }
+    if (led.power) { engine.stop(); led.setPower(false); paintSpecial('off'); }
+    else { led.setPower(true); led.show(...led.cur); }
+  });
+  $('#nowStop').addEventListener('click', () => { engine.stop(); applyManual(); });
+
+  // sekmeler
+  document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
+  let prevTab = 'color';
+  $('#setBtn').addEventListener('click', () => { if (S.tab === 'set') setTab(prevTab); else { prevTab = S.tab; setTab('set'); } });
+
+  // renk
+  const wb = wheel.box;
+  wb.addEventListener('pointerdown', e => { wheel.drag = true; try { wb.setPointerCapture(e.pointerId); } catch {} wheel.pick(e); });
+  wb.addEventListener('pointermove', e => { if (wheel.drag) wheel.pick(e); });
+  const endDrag = () => { wheel.drag = false; };
+  wb.addEventListener('pointerup', endDrag); wb.addEventListener('pointercancel', endDrag);
+  const SW = ['#ff0000', '#ff5a00', '#ffb000', '#ffff00', '#7dff00', '#00ff40', '#00ffc8', '#00c8ff', '#0050ff', '#5a00ff', '#b400ff', '#ff00c8', '#ff0064', '#ffffff', '#ffd3a0', '#ffb46b'];
+  $('#swatches').innerHTML = SW.map(c => `<button class="sw" style="background:${c}" data-c="${c}" aria-label="${c}"></button>`).join('');
+  $('#swatches').addEventListener('click', e => { const b = e.target.closest('[data-c]'); if (!b) return; const [h, s] = hexToHsv(b.dataset.c); setManual(h, s); });
+  bindRange('master', 'masterOut', () => S.master, v => {
+    S.master = v;
+    if (engine.kind === 'fx') ble.send('bri', P.bright(briRaw(v / 100)));
+    else if (!engine.timer && led.power) led.show(...led.cur);
+    else if (!engine.timer) paint(led.cur[0], led.cur[1], led.cur[2] * v / 100);
+  }, v => v + '%');
+
+  // animasyon
+  bindRange('speed', 'speedOut', () => S.speed, v => { S.speed = v; }, v => Math.pow(2, v).toFixed(2).replace(/\.?0+$/, '') + '×');
+  $('#userAnims').addEventListener('click', onAnimClick);
+  $('#builtinAnims').addEventListener('click', onAnimClick);
+  $('#newAnim').addEventListener('click', () => openEditor(null));
+  $('#edName').addEventListener('input', e => { edit.name = e.target.value; });
+  $('#edSteps').addEventListener('input', e => {
+    const row = e.target.closest('.step'); if (!row || !e.target.dataset.k) return;
+    const s = edit.steps[+row.dataset.i], k = e.target.dataset.k;
+    s[k] = k === 'c' ? e.target.value : clamp(parseFloat(e.target.value) || 0, 0, 60);
+    edChanged();
+  });
+  $('#edSteps').addEventListener('click', e => {
+    const b = e.target.closest('[data-a]'); if (!b) return;
+    const i = +b.closest('.step').dataset.i;
+    if (b.dataset.a === 'up' && i > 0) [edit.steps[i - 1], edit.steps[i]] = [edit.steps[i], edit.steps[i - 1]];
+    if (b.dataset.a === 'del' && edit.steps.length > 1) edit.steps.splice(i, 1);
+    renderEditor();
+  });
+  $('#edAdd').addEventListener('click', () => {
+    const last = edit.steps[edit.steps.length - 1];
+    const h = last ? (hexToHsv(last.c)[0] + 70) % 360 : 0;
+    edit.steps.push({ c: hsvHex(h, 1, 1), f: last ? last.f : 1, h: last ? last.h : 1 });
+    renderEditor();
+  });
+  $('#edPlay').addEventListener('click', () => {
+    if (playingId === '__edit') { engine.stop(); return; }
+    playAnim({ id: '__edit', name: edit.name || 'Yeni animasyon', steps: edit.steps });
+  });
+  $('#edCancel').addEventListener('click', closeEditor);
+  $('#edSave').addEventListener('click', () => {
+    const a = { id: edit.id || ('u' + Date.now().toString(36)), name: edit.name.trim() || 'Animasyonum',
+                steps: edit.steps.map(s => ({ c: s.c, f: +s.f || 0, h: +s.h || 0 })) };
+    const i = userAnims.findIndex(x => x.id === a.id);
+    if (i >= 0) userAnims[i] = a; else userAnims.unshift(a);
+    store.set('anims', userAnims);
+    closeEditor(); playAnim(a); toast('Kaydedildi ve oynatılıyor');
+  });
+
+  // müzik
+  $('#micBtn').addEventListener('click', toggleMusic);
+  $('#srcSel').value = S.music.src;
+  $('#srcSel').addEventListener('change', e => { S.music.src = e.target.value; save(); if (engine.kind === 'music') { engine.stop(); toggleMusic(); } });
+  bindRange('mSens', 'sensOut', () => S.music.sens, v => { S.music.sens = v; }, v => v.toFixed(2) + '×');
+  bindRange('mSmooth', 'smoothOut', () => S.music.smooth, v => { S.music.smooth = v; }, v => Math.round(v * 100) + '%');
+  bindRange('mFloor', 'floorOut', () => S.music.floor, v => { S.music.floor = v; }, v => Math.round(v * 100) + '%');
+  renderDesigns();
+  $('#mDesigns').addEventListener('click', onDesignClick);
+  $('#mNew').addEventListener('click', () => openDesignEditor(null));
+  $('#mdName').addEventListener('input', e => { dEdit.name = e.target.value; if (musicDesign === dEdit && engine.kind === 'music') setNow(musicLabel()); });
+  $('#mdColors').addEventListener('input', e => { if (e.target.dataset.i != null) dEdit.colors[+e.target.dataset.i] = e.target.value; });
+  $('#mdColors').addEventListener('click', e => {
+    if (e.target.id === 'mdAddColor') {
+      const last = dEdit.colors[dEdit.colors.length - 1];
+      dEdit.colors.push(hsvHex((hexToHsv(last)[0] + 90) % 360, 1, 1)); renderDesignEditor();
+    } else if (e.target.dataset.rm != null && dEdit.colors.length > 1) {
+      dEdit.colors.splice(+e.target.dataset.rm, 1); renderDesignEditor();
+    }
+  });
+  $('#mEditor').addEventListener('click', e => {
+    const c = e.target.closest('[data-f]'); if (!c) return;
+    dEdit[c.dataset.f] = c.dataset.f === 'change' ? +c.dataset.v : c.dataset.v;
+    renderDesignEditor();
+  });
+  $('#mdFade').addEventListener('input', e => { dEdit.fade = parseFloat(e.target.value); $('#mdFadeOut').textContent = dEdit.fade.toFixed(1) + ' sn'; });
+  $('#mdTry').addEventListener('click', () => {
+    musicDesign = dEdit;
+    if (engine.kind !== 'music') toggleMusic(); else setNow(musicLabel());
+    toast('Deneme: değişiklikler anında uygulanır');
+  });
+  $('#mdCancel').addEventListener('click', closeDesignEditor);
+  $('#mdSave').addEventListener('click', () => {
+    const d = { id: dEdit.id || ('d' + Date.now().toString(36)), name: dEdit.name.trim() || 'Tasarımım', colors: dEdit.colors.slice(),
+                change: dEdit.change, trans: dEdit.trans, fade: dEdit.fade, bright: dEdit.bright, order: dEdit.order };
+    const i = userDesigns.findIndex(x => x.id === d.id);
+    if (i >= 0) userDesigns[i] = d; else userDesigns.unshift(d);
+    store.set('designs', userDesigns);
+    S.music.design = d.id; save();
+    closeDesignEditor(); selectDesign(d);
+    toast(engine.kind === 'music' ? 'Kaydedildi, şimdi bu tasarım çalıyor' : 'Kaydedildi. Dinlemeyi başlatınca bu tasarım çalar.');
+  });
+
+  // görüntü
+  $('#camBtn').addEventListener('click', toggleVideo);
+  $('#camSrc').value = S.video.src;
+  $('#camSrc').addEventListener('change', e => { S.video.src = e.target.value; save(); if (engine.kind === 'video') { engine.stop(); toggleVideo(); } });
+  const renderVMode = () => document.querySelectorAll('#vMode .chip').forEach(c => c.classList.toggle('active', c.dataset.v === S.video.mode));
+  $('#vMode').addEventListener('click', e => { const c = e.target.closest('[data-v]'); if (!c) return; S.video.mode = c.dataset.v; save(); renderVMode(); });
+  renderVMode();
+  bindRange('vSat', 'vSatOut', () => S.video.sat, v => { S.video.sat = v; }, v => v.toFixed(1) + '×');
+  bindRange('vSmooth', 'vSmoothOut', () => S.video.smooth, v => { S.video.smooth = v; }, v => Math.round(v * 100) + '%');
+  bindRange('vCropR', 'vCropOut', () => S.video.crop, v => { S.video.crop = v; updCrop(); }, v => Math.round(v * 100) + '%');
+  updCrop();
+  $('#vFollow').checked = S.video.follow;
+  $('#vFollow').addEventListener('change', e => { S.video.follow = e.target.checked; save(); });
+
+  // efektler
+  renderFx();
+  $('#fxList').addEventListener('click', e => { const b = e.target.closest('[data-code]'); if (b) playFx(+b.dataset.code, b.dataset.name); });
+  $('#fxDir').addEventListener('click', e => {
+    const b = e.target.closest('[data-dir]'); if (!b) return;
+    S.fxDir = +b.dataset.dir; save(); renderFx();
+    if (engine.kind === 'fx') ble.send('dir', P.dir(S.fxDir));
+  });
+
+  // ayarlar
+  $('#connectAll').addEventListener('click', () => ble.choose(true));
+  $('#disconnectBtn').addEventListener('click', () => ble.disconnect());
+  bindRange('gap', 'gapOut', () => S.gap, v => { S.gap = v; }, v => v + ' ms');
+  bindRange('minRaw', 'minRawOut', () => S.minRaw, v => { S.minRaw = v; led.invalidate(); }, v => v + ' / 1000');
+  $('#rawSend').addEventListener('click', () => {
+    const t = $('#rawHex').value.replace(/0x/gi, '').replace(/[^0-9a-f]/gi, '');
+    if (!t || t.length % 2) { toast('Geçersiz hex. Örnek: BC 01 01 00 55'); return; }
+    const bytes = t.match(/../g).map(x => parseInt(x, 16));
+    if (!ble.ok) toast('Bağlı değilsin, komut sadece günlüğe yazıldı.');
+    ble.send('raw' + Date.now(), bytes);
+  });
+  $('#logOn').addEventListener('change', e => { ble.logOn = e.target.checked; $('#log').classList.toggle('hidden', !ble.logOn); });
+  $('#exportBtn').addEventListener('click', () => {
+    $('#backup').value = JSON.stringify({ ledstudyo: 1, anims: userAnims, designs: userDesigns }, null, 1);
+    $('#backup').select();
+    toast(`${userAnims.length} animasyon, ${userDesigns.length} müzik tasarımı dışa aktarıldı. Metni kopyalayıp sakla.`);
+  });
+  $('#importBtn').addEventListener('click', () => {
+    let d;
+    try { d = JSON.parse($('#backup').value); } catch { toast('Yedek okunamadı. Dışa aktar ile alınmış metni yapıştır.'); return; }
+    const isHex = c => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
+    const upsert = (arr, x) => { const i = arr.findIndex(y => y.id === x.id); if (i >= 0) arr[i] = x; else arr.push(x); };
+    const anims = (Array.isArray(d) ? d : (d && d.anims) || []).filter(a => a && a.name && Array.isArray(a.steps) && a.steps.length && a.steps.every(s => s && isHex(s.c)));
+    const designs = ((d && d.designs) || []).filter(x => x && x.name && Array.isArray(x.colors) && x.colors.length && x.colors.length <= 6 && x.colors.every(isHex));
+    for (const a of anims) upsert(userAnims, { id: String(a.id || 'u' + Math.random().toString(36).slice(2)), name: String(a.name).slice(0, 40),
+      steps: a.steps.map(s => ({ c: s.c, f: clamp(+s.f || 0, 0, 60), h: clamp(+s.h || 0, 0, 60) })) });
+    for (const x of designs) upsert(userDesigns, { id: String(x.id || 'd' + Math.random().toString(36).slice(2)), name: String(x.name).slice(0, 40),
+      colors: x.colors.slice(), change: [0, 1, 2, 4, 8].includes(+x.change) ? +x.change : 1, trans: x.trans === 'cut' ? 'cut' : 'fade',
+      fade: clamp(+x.fade || 0.4, 0.1, 3), bright: ['pulse', 'flash', 'steady'].includes(x.bright) ? x.bright : 'pulse', order: x.order === 'random' ? 'random' : 'seq' });
+    if (!anims.length && !designs.length) { toast('Yedekte animasyon ya da tasarım bulunamadı.'); return; }
+    store.set('anims', userAnims); store.set('designs', userDesigns); renderAnims(); renderDesigns();
+    toast(`${anims.length} animasyon, ${designs.length} müzik tasarımı içe aktarıldı.`);
+  });
+
+  // başlangıç
+  setConn('off', 'Bağlı değil');
+  paint(S.hsv[0], S.hsv[1], S.master / 100);
+  renderAnims();
+  setTab(['color', 'anim', 'music', 'video', 'fx', 'set'].includes(S.tab) ? S.tab : 'color');
+  drawViz(null);
+  let rT; window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(() => { wheel.draw(); sizeViz(); }, 150); });
+}
+init();
+// Konsoldan deneme için
+window.LED = { P, ble, led, engine, audio, S };
+</script>
+</body>
+</html>
