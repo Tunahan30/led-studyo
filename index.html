@@ -309,6 +309,23 @@ ol.help li{margin:3px 0}
       </div>
     </div>
     <div class="card">
+      <h2>Renk sırası</h2>
+      <p class="muted" style="margin:0 0 10px">Seçtiğin renk şeritte farklı görünüyorsa (ör. kırmızı yerine mavi) şeridin renk kabloları farklı sırada bağlanmıştır. <b>Test et</b>'e bas, iki soruyu cevapla; uygulama kendini ona göre ayarlar.</p>
+      <div class="row">
+        <select id="orderSel">
+          <option value="RGB">RGB (varsayılan)</option><option value="RBG">RBG</option><option value="GRB">GRB</option>
+          <option value="GBR">GBR</option><option value="BRG">BRG</option><option value="BGR">BGR</option>
+        </select>
+        <button class="btn sm primary" id="orderTest">Test et</button>
+      </div>
+      <div id="orderWiz" class="hidden" style="margin-top:12px">
+        <p id="orderQ" style="margin:0 0 10px"></p>
+        <div class="chips" id="orderAns">
+          <button class="chip" data-c="R">🔴 Kırmızı</button><button class="chip" data-c="G">🟢 Yeşil</button><button class="chip" data-c="B">🔵 Mavi</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
       <h2>İnce ayar</h2>
       <label class="sl"><div class="row"><span>Komutlar arası bekleme</span><output id="gapOut"></output></div>
         <input type="range" id="gap" min="10" max="120" step="5"></label>
@@ -400,7 +417,7 @@ const smoothstep = x => x * x * (3 - 2 * x);
    Ayarlar (tarayıcıda saklanır)
    ============================================================ */
 const DEF = {
-  master: 80, speed: 0, gap: 30, minRaw: 10, hsv: [275, 0.85, 1], tab: 'color', fxDir: 1,
+  master: 80, speed: 0, gap: 30, minRaw: 10, hsv: [275, 0.85, 1], tab: 'color', fxDir: 1, order: 'RGB',
   music: { design: 'm-pulse', src: 'mic', sens: 1, smooth: 0.5, floor: 0.05 },
   video: { src: 'camera', mode: 'vivid', sat: 1.4, smooth: 0.5, crop: 0.7, follow: true }
 };
@@ -566,7 +583,8 @@ const led = {
     const b = clamp(v, 0, 1) * S.master / 100;
     paint(h, s, b);
     if (this.needOn || !this.power) { this.needOn = false; this.power = true; ble.send('power', P.on()); updPower(); }
-    const hq = Math.round(h) % 360, sq = Math.round(clamp(s, 0, 1) * 1000);
+    const [mh, ms] = mapOrder(h, s);
+    const hq = Math.round(mh) % 360, sq = Math.round(clamp(ms, 0, 1) * 1000);
     // Siyaha yakın renklerde tonu değiştirme: "siyah" = son rengin en düşük parlaklığı
     if (v > 0.004 || this.last.h < 0) {
       if (hq !== this.last.h || sq !== this.last.s) { this.last.h = hq; this.last.s = sq; ble.send('color', P.color(hq, sq)); }
@@ -583,6 +601,44 @@ const led = {
   }
 };
 function applyManual() { led.invalidate(); led.show(S.hsv[0], S.hsv[1], 1); }
+
+/* ---------- renk sırası ----------
+   S.order, kontrolcünün R, G, B çıkışlarının şeritte hangi renkleri yaktığını söyler.
+   Örn. "BGR": kontrolcü kırmızı sandığında şerit mavi yanar. İstenen rengi göstermek için
+   kanalları ters yönde karıştırıp öyle gönderiyoruz. */
+const ORDERS = ['RGB', 'RBG', 'GRB', 'GBR', 'BRG', 'BGR'];
+function mapOrder(h, s) {
+  const o = S.order;
+  if (!o || o === 'RGB') return [h, s];
+  const [r, g, b] = hsvToRgb(h, s, 1), want = { R: r, G: g, B: b };
+  const [h2, s2] = rgbToHsv(want[o[0]], want[o[1]], want[o[2]]);
+  return [h2, s2];
+}
+const orderWiz = {
+  step: 0, first: null,
+  start() {
+    if (!ble.ok) { toast('Önce şeride bağlan.'); return; }
+    engine.stop(); this.step = 1; this.first = null;
+    this.show(0, 'Şerit şu an hangi renkte yanıyor?');
+  },
+  // sıralamayı atlayıp ham ton gönder: 0 = kontrolcünün kırmızısı, 120 = yeşili
+  show(hue, q) {
+    if (led.needOn || !led.power) led.setPower(true);
+    ble.send('color', P.color(hue, 1000)); ble.send('bri', P.bright(briRaw(S.master / 100)));
+    led.invalidate();
+    $('#orderQ').textContent = q;
+    $('#orderWiz').classList.remove('hidden');
+  },
+  answer(c) {
+    if (this.step === 1) { this.first = c; this.step = 2; this.show(120, 'Peki şimdi hangi renkte?'); return; }
+    if (c === this.first) { toast('İki cevap aynı olamaz, test yeniden başlıyor.'); this.start(); return; }
+    const third = 'RGB'.split('').find(x => x !== this.first && x !== c);
+    S.order = this.first + c + third; save();
+    $('#orderSel').value = S.order; $('#orderWiz').classList.add('hidden'); this.step = 0;
+    applyManual();
+    toast(S.order === 'RGB' ? 'Renk sırası zaten doğru (RGB).' : `Renk sırası ${S.order} olarak ayarlandı. Şerit şimdi Renk sekmesindeki rengi göstermeli.`, 5000);
+  }
+};
 
 /* ============================================================
    Oynatma motoru: animasyon / müzik / donanım efekti — aynı anda biri
@@ -1382,6 +1438,10 @@ function init() {
   // ayarlar
   $('#connectAll').addEventListener('click', () => ble.choose(true));
   $('#disconnectBtn').addEventListener('click', () => ble.disconnect());
+  $('#orderSel').value = ORDERS.includes(S.order) ? S.order : 'RGB';
+  $('#orderSel').addEventListener('change', e => { S.order = e.target.value; save(); if (!engine.timer && engine.kind !== 'fx') applyManual(); else led.invalidate(); });
+  $('#orderTest').addEventListener('click', () => orderWiz.start());
+  $('#orderAns').addEventListener('click', e => { const b = e.target.closest('[data-c]'); if (b && orderWiz.step) orderWiz.answer(b.dataset.c); });
   bindRange('gap', 'gapOut', () => S.gap, v => { S.gap = v; }, v => v + ' ms');
   bindRange('minRaw', 'minRawOut', () => S.minRaw, v => { S.minRaw = v; led.invalidate(); }, v => v + ' / 1000');
   $('#rawSend').addEventListener('click', () => {
