@@ -817,7 +817,7 @@ const audio = {
 };
 
 function makeMusicFn() {
-  const st = { fl: { b: 255, a: 255 }, pk: { b: 0, a: 0 }, env: 0, envA: 0, bassAvg: 0, prevBass: 0, lastBeat: 0, flash: 0,
+  const st = { fl: { b: 255, a: 255 }, pk: { b: 0, a: 0 }, env: 0, envA: 0, prev: null, fluxAvg: 0, lastBeat: performance.now(), flash: 0,
                D: null, idx: 0, beats: 0, cur: null, from: null, to: null, tt: 1, pos: 0, hue: 0, energy: 0, acc: 0 };
   return (t, dt) => {
     if (!audio.an) return null;
@@ -827,7 +827,7 @@ function makeMusicFn() {
       const a = Math.max(1, Math.floor(lo / binHz)), b = Math.min(buf.length - 1, Math.ceil(hi / binHz));
       let s = 0; for (let i = a; i <= b; i++) s += buf[i]; return s / (b - a + 1);
     };
-    const bass = band(35, 150), all = band(35, 8000);
+    const bass = band(40, 250), all = band(35, 8000);
     let num = 0, den = 0; const top = Math.min(buf.length, Math.floor(8000 / binHz));
     for (let i = 2; i < top; i++) { num += i * binHz * buf[i]; den += buf[i]; }
     const cent = den ? num / den : 0;
@@ -844,12 +844,21 @@ function makeMusicFn() {
     const tb = silent ? 0 : lb, ta = silent ? 0 : la;
     st.env += (tb - st.env) * (tb > st.env ? 0.75 : rel);
     st.envA += (ta - st.envA) * (ta > st.envA ? 0.6 : rel);
-    // vuruş algılama: bas, son yarım saniyenin ortalamasının belirgin üstüne çıkınca
+    // Vuruş algılama (spektral akı): 40-250 Hz bantlarının bir önceki kareye göre ne kadar
+    // YÜKSELDİĞİ toplanır. Davul vuruşu ani bir sıçrama yapar, sürekli ses/gürültü yapmaz.
+    // TV hoparlörü ve telefon mikrofonu derin bası (<100 Hz) zayıf taşıdığı için bant geniş tutuldu.
     const now = performance.now(); let beat = false;
-    // (yalnızca bas yükselirken: sönen vuruşun kuyruğu ikinci vuruş sayılmasın)
-    if (!silent && bass > 28 && bass >= st.prevBass && bass > st.bassAvg * (1 + 0.3 / sens) && now - st.lastBeat > 200) { beat = true; st.lastBeat = now; }
-    st.bassAvg = st.bassAvg * 0.92 + bass * 0.08;
-    st.prevBass = bass;
+    const fa = Math.max(1, Math.floor(40 / binHz)), fb = Math.min(buf.length - 1, Math.ceil(250 / binHz));
+    if (!st.prev) st.prev = new Uint8Array(buf.length);
+    let flux = 0;
+    for (let i = fa; i <= fb; i++) { const d = buf[i] - st.prev[i]; if (d > 0) flux += d; }
+    flux /= (fb - fa + 1);
+    st.prev.set(buf);
+    if (!silent && flux > st.fluxAvg * 1.8 + 10 / sens && now - st.lastBeat > 200) beat = true;
+    // müzik çalıyor ama 2,5 sn boyunca vuruş bulunamadıysa renkler yine de ilerlesin
+    else if (!silent && ta > 0.12 && now - st.lastBeat > 2500) beat = true;
+    if (beat) { st.lastBeat = now; beatCount++; }
+    st.fluxAvg = st.fluxAvg * 0.95 + flux * 0.05;
 
     const fl = M.floor, V = x => fl + (1 - fl) * clamp(x, 0, 1);
     const D = musicDesign;
@@ -902,7 +911,7 @@ function sizeViz() {
   viz.width = Math.round(w * dpr); viz.height = Math.round(120 * dpr);
   if (engine.kind !== 'music') drawViz(null);
 }
-let beatGlow = 0;
+let beatGlow = 0, beatCount = 0;
 function drawViz(buf, binHz, hsv, beat) {
   const c = viz.getContext('2d'), W = viz.width, H = viz.height;
   c.clearRect(0, 0, W, H);
@@ -926,6 +935,12 @@ function drawViz(buf, binHz, hsv, beat) {
     c.fillRect(i * bw + 1, H - h, bw - 2, h);
   }
   c.globalAlpha = 1;
+  // sol üstte vuruş göstergesi: her algılanan vuruşta yanar
+  const px = viz.clientWidth ? W / viz.clientWidth : 1;
+  c.fillStyle = beatGlow > 0.3 ? `rgb(${r},${g},${b})` : 'rgba(255,255,255,.22)';
+  c.beginPath(); c.arc(14 * px, 14 * px, 6 * px, 0, Math.PI * 2); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.75)'; c.font = `${12 * px}px system-ui, sans-serif`; c.textBaseline = 'middle';
+  c.fillText(beatCount + ' vuruş', 26 * px, 14.5 * px);
   // sağ kenarda gönderilen parlaklık
   c.fillStyle = 'rgba(255,255,255,.85)';
   c.fillRect(W - 4, H - H * hsv[2], 4, H * hsv[2]);
@@ -943,6 +958,7 @@ async function toggleMusic() {
   try { await audio.open(S.music.src); }
   catch (e) { audio.close(); toast(micErr(e), 5500); updMicBtn(); return; }
   finally { btn.disabled = false; }
+  beatCount = 0;
   engine.run('music', musicLabel(), makeMusicFn(), () => { audio.close(); updMicBtn(); drawViz(null); });
   updMicBtn();
 }
@@ -1259,12 +1275,14 @@ function init() {
   $('#builtinAnims').addEventListener('click', onAnimClick);
   $('#newAnim').addEventListener('click', () => openEditor(null));
   $('#edName').addEventListener('input', e => { edit.name = e.target.value; });
-  $('#edSteps').addEventListener('input', e => {
+  const onStepInput = e => {
     const row = e.target.closest('.step'); if (!row || !e.target.dataset.k) return;
     const s = edit.steps[+row.dataset.i], k = e.target.dataset.k;
     s[k] = k === 'c' ? e.target.value : clamp(parseFloat(e.target.value) || 0, 0, 60);
     edChanged();
-  });
+  };
+  $('#edSteps').addEventListener('input', onStepInput);
+  $('#edSteps').addEventListener('change', onStepInput);
   $('#edSteps').addEventListener('click', e => {
     const b = e.target.closest('[data-a]'); if (!b) return;
     const i = +b.closest('.step').dataset.i;
@@ -1303,7 +1321,10 @@ function init() {
   $('#mDesigns').addEventListener('click', onDesignClick);
   $('#mNew').addEventListener('click', () => openDesignEditor(null));
   $('#mdName').addEventListener('input', e => { dEdit.name = e.target.value; if (musicDesign === dEdit && engine.kind === 'music') setNow(musicLabel()); });
-  $('#mdColors').addEventListener('input', e => { if (e.target.dataset.i != null) dEdit.colors[+e.target.dataset.i] = e.target.value; });
+  // Android'in renk seçicisi bazen yalnızca "change" gönderir; ikisini de dinle
+  const onDesignColor = e => { if (e.target.dataset.i != null) dEdit.colors[+e.target.dataset.i] = e.target.value; };
+  $('#mdColors').addEventListener('input', onDesignColor);
+  $('#mdColors').addEventListener('change', onDesignColor);
   $('#mdColors').addEventListener('click', e => {
     if (e.target.id === 'mdAddColor') {
       const last = dEdit.colors[dEdit.colors.length - 1];
