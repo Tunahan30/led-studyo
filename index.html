@@ -80,7 +80,11 @@ input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent);margin:0}
 .step label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px}
 .step .acts{display:flex;gap:4px}
 input[type=color]{width:46px;height:46px;border:1px solid var(--line);padding:3px;background:#0f131b;border-radius:12px}
-input[type=number],input[type=text],textarea,select{width:100%;background:#0f131b;border:1px solid var(--line);border-radius:10px;padding:9px 10px;min-height:42px}
+.chips.scroll{flex-wrap:nowrap;overflow-x:auto;padding-bottom:6px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.chips.scroll::-webkit-scrollbar{display:none}
+.chips.scroll .chip{flex:none}
+.libhead{margin-top:18px}
+input[type=number],input[type=text],input[type=search],textarea,select{width:100%;background:#0f131b;border:1px solid var(--line);border-radius:10px;padding:9px 10px;min-height:42px}
 input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 textarea{min-height:110px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;resize:vertical}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
@@ -178,6 +182,14 @@ ol.help li{margin:3px 0}
       <div id="userAnims"></div>
       <div style="margin:18px 2px 10px"><b>Hazır animasyonlar</b></div>
       <div id="builtinAnims"></div>
+      <div class="card libhead">
+        <div class="row between"><b>Kütüphane</b><span class="muted" id="alCount"></span></div>
+        <p class="muted" style="margin:4px 0 10px">Renk paletleri ve animasyon stillerinden oluşan hazır animasyonlar. Beğendiğini "Kaydet" ile kendi listene alıp düzenleyebilirsin.</p>
+        <div class="row"><input type="search" id="alSearch" placeholder="Ara: gün batımı, neon, nefes…" enterkeyhint="search"><button class="btn sm" id="alRandom">🎲 Rastgele</button></div>
+        <div class="chips scroll" id="alStyles" style="margin-top:10px"></div>
+      </div>
+      <div id="alList"></div>
+      <button class="btn sm" id="alMore" style="width:100%;margin-bottom:14px">Daha fazla göster</button>
     </div>
 
     <div id="editorView" class="hidden">
@@ -213,6 +225,14 @@ ol.help li{margin:3px 0}
     <div id="mListView">
       <div class="row between" style="margin:4px 2px 10px"><b>Müzik tasarımlarım</b><button class="btn sm primary" id="mNew">+ Yeni tasarım</button></div>
       <div id="mDesigns"></div>
+      <div class="card libhead">
+        <div class="row between"><b>Tasarım kütüphanesi</b><span class="muted" id="mlCount"></span></div>
+        <p class="muted" style="margin:4px 0 10px">Dokun, hemen çalsın. Beğendiğini "Kaydet" ile kendi tasarımlarına alıp renklerini değiştirebilirsin.</p>
+        <div class="row"><input type="search" id="mlSearch" placeholder="Ara: neon, okyanus, flaş…" enterkeyhint="search"><button class="btn sm" id="mlRandom">🎲 Rastgele</button></div>
+        <div class="chips scroll" id="mlStyles" style="margin-top:10px"></div>
+      </div>
+      <div id="mlList"></div>
+      <button class="btn sm" id="mlMore" style="width:100%;margin-bottom:14px">Daha fazla göster</button>
     </div>
 
     <div id="mEditor" class="hidden">
@@ -268,6 +288,18 @@ ol.help li{margin:3px 0}
           <option value="screen">Ekran paylaşımı (bilgisayar)</option>
         </select>
       </div>
+    </div>
+    <div class="card">
+      <div class="sub" style="margin-top:0">Efekt</div>
+      <div class="chips" id="vFx">
+        <button class="chip" data-v="follow">Takip</button>
+        <button class="chip" data-v="palette">Ekran paleti</button>
+        <button class="chip" data-v="breath">Nefes</button>
+        <button class="chip" data-v="music">Müzikle</button>
+        <button class="chip" data-v="flash">Sahne flaşı</button>
+      </div>
+      <p class="muted" id="vFxDesc"></p>
+      <div class="dots hidden" id="vPal" title="Ekrandaki renkler"><i></i><i></i><i></i></div>
     </div>
     <div class="card">
       <div class="sub" style="margin-top:0">Renk nasıl seçilsin?</div>
@@ -419,7 +451,7 @@ const smoothstep = x => x * x * (3 - 2 * x);
 const DEF = {
   master: 80, speed: 0, gap: 30, minRaw: 10, hsv: [275, 0.85, 1], tab: 'color', fxDir: 1, order: 'RGB',
   music: { design: 'm-pulse', src: 'mic', sens: 1, smooth: 0.5, floor: 0.05 },
-  video: { src: 'camera', mode: 'vivid', sat: 1.4, smooth: 0.5, crop: 0.7, follow: true }
+  video: { src: 'camera', mode: 'vivid', sat: 1.4, smooth: 0.5, crop: 0.7, follow: true, fx: 'follow' }
 };
 const savedS = store.get('settings', {}) || {};
 const S = Object.assign({}, DEF, savedS, {
@@ -757,8 +789,9 @@ function animCard(a, user) {
   return `<div class="anim ${on ? 'playing' : ''}" data-id="${esc(a.id)}">
     <button class="btn iconbtn ${on ? 'primary' : ''}" data-act="play" aria-label="${on ? 'Durdur' : 'Çal'}">${on ? ICON_STOP : ICON_PLAY}</button>
     <div class="meta"><div class="nm">${esc(a.name)}</div>${a.desc ? `<div class="muted">${esc(a.desc)}</div>` : ''}<div class="bar" style="background:${bar}"></div></div>
-    <div class="acts">${user
+    <div class="acts">${user === true
       ? `<button class="btn sm" data-act="edit">Düzenle</button><button class="btn sm danger" data-act="del" aria-label="Sil">✕</button>`
+      : user === 'lib' ? (a.steps ? `<button class="btn sm" data-act="save">Kaydet</button>` : '')
       : (a.steps ? `<button class="btn sm" data-act="copy">Kopyala</button>` : '')}</div>
   </div>`;
 }
@@ -766,14 +799,19 @@ function renderAnims() {
   $('#userAnims').innerHTML = userAnims.length ? userAnims.map(a => animCard(a, true)).join('')
     : '<div class="muted" style="margin:0 2px 8px">Henüz kendi animasyonun yok. "+ Yeni animasyon" ile renkleri ve süreleri sen seç.</div>';
   $('#builtinAnims').innerHTML = BUILTINS.map(a => animCard(a, false)).join('');
+  if (animLib) animLib.render();
 }
 function onAnimClick(e) {
   const btn = e.target.closest('[data-act]'); if (!btn) return;
   const id = btn.closest('[data-id]').dataset.id;
-  const a = userAnims.find(x => x.id === id) || BUILTINS.find(x => x.id === id);
+  const a = userAnims.find(x => x.id === id) || BUILTINS.find(x => x.id === id) || libAnimById(id);
   if (!a) return;
   const act = btn.dataset.act;
   if (act === 'play') { if (playingId === id) engine.stop(); else playAnim(a); }
+  else if (act === 'save') {
+    userAnims.unshift({ id: 'u' + Date.now().toString(36), name: a.name, steps: a.steps.map(s => ({ ...s })) });
+    store.set('anims', userAnims); renderAnims(); toast('"' + a.name + '" Animasyonlarım\'a eklendi');
+  }
   else if (act === 'edit') openEditor(a);
   else if (act === 'copy') openEditor({ id: null, name: a.name + ' (kopya)', steps: a.steps });
   else if (act === 'del') {
@@ -832,8 +870,8 @@ const ORDER_OPTS = [['seq', 'Sırayla'], ['random', 'Rastgele']];
 const optName = (opts, v) => (opts.find(o => o[0] === v) || ['', ''])[1];
 let userDesigns = store.get('designs', []);
 if (!Array.isArray(userDesigns)) userDesigns = [];
-const findDesign = id => userDesigns.find(d => d.id === id) || MUSIC_BUILTINS.find(d => d.id === id);
-let musicDesign = findDesign(S.music.design) || MUSIC_BUILTINS[0];
+const findDesign = id => userDesigns.find(d => d.id === id) || MUSIC_BUILTINS.find(d => d.id === id) || libDesignById(id);
+let musicDesign = null; // kütüphane yüklendikten sonra atanır (aşağıda)
 function designSummary(d) {
   if (d.algo) return d.desc;
   const parts = [optName(CHANGE_OPTS, d.change)];
@@ -872,10 +910,11 @@ const audio = {
   }
 };
 
-function makeMusicFn() {
-  const st = { fl: { b: 255, a: 255 }, pk: { b: 0, a: 0 }, env: 0, envA: 0, prev: null, fluxAvg: 0, lastBeat: performance.now(), flash: 0,
-               D: null, idx: 0, beats: 0, cur: null, from: null, to: null, tt: 1, pos: 0, hue: 0, energy: 0, acc: 0 };
-  return (t, dt) => {
+/* Ses analizi: her karede seviye zarfı (env), vuruş ve ton merkezi üretir.
+   Müzik modu ve görüntünün "Müzikle" efekti bunu ortak kullanır. */
+function makeAnalyzer() {
+  const st = { fl: { b: 255, a: 255 }, pk: { b: 0, a: 0 }, env: 0, envA: 0, prev: null, fluxAvg: 0, lastBeat: performance.now() };
+  return () => {
     if (!audio.an) return null;
     const buf = audio.buf; audio.an.getByteFrequencyData(buf);
     const binHz = audio.ctx.sampleRate / audio.an.fftSize, M = S.music, sens = M.sens;
@@ -915,7 +954,17 @@ function makeMusicFn() {
     else if (!silent && ta > 0.12 && now - st.lastBeat > 2500) beat = true;
     if (beat) { st.lastBeat = now; beatCount++; }
     st.fluxAvg = st.fluxAvg * 0.95 + flux * 0.05;
+    return { buf, binHz, beat, env: st.env, envA: st.envA, ta, cent };
+  };
+}
 
+function makeMusicFn() {
+  const analyze = makeAnalyzer();
+  const st = { flash: 0, D: null, idx: 0, beats: 0, cur: null, from: null, to: null, tt: 1, pos: 0, hue: 0, energy: 0, acc: 0, env: 0, envA: 0 };
+  return (t, dt) => {
+    const A = analyze(); if (!A) return null;
+    const { beat, ta, cent } = A, M = S.music;
+    st.env = A.env; st.envA = A.envA;
     const fl = M.floor, V = x => fl + (1 - fl) * clamp(x, 0, 1);
     const D = musicDesign;
     let out;
@@ -955,7 +1004,7 @@ function makeMusicFn() {
       else b = V(st.env);
       out = [st.cur[0], st.cur[1], b * st.cur[2]];
     }
-    drawViz(buf, binHz, out, beat);
+    drawViz(A.buf, A.binHz, out, beat);
     return out;
   };
 }
@@ -1028,8 +1077,9 @@ function designCard(d, user) {
     : `<div class="dots">${d.colors.map(c => `<i style="background:${esc(c)}"></i>`).join('')}</div>`;
   return `<div class="anim design ${sel ? 'sel' : ''}" data-id="${esc(d.id)}" data-act="pick">
     <div class="meta"><div class="nm">${esc(d.name)}</div><div class="muted">${esc(designSummary(d))}</div>${look}</div>
-    <div class="acts">${user
+    <div class="acts">${user === true
       ? `<button class="btn sm" data-act="edit">Düzenle</button><button class="btn sm danger" data-act="del" aria-label="Sil">✕</button>`
+      : user === 'lib' ? `<button class="btn sm" data-act="save">Kaydet</button>`
       : (d.algo ? '' : `<button class="btn sm" data-act="copy">Kopyala</button>`)}</div>
   </div>`;
 }
@@ -1039,6 +1089,7 @@ function renderDesigns() {
       : '<div class="muted" style="margin:0 2px 10px">"+ Yeni tasarım" ile renklerini seç ve sese nasıl tepki vereceklerini belirle.</div>')
     + '<div style="margin:16px 2px 10px"><b>Hazır tasarımlar</b></div>'
     + MUSIC_BUILTINS.map(d => designCard(d, false)).join('');
+  if (musicLib) musicLib.render();
 }
 function selectDesign(d) {
   musicDesign = d; S.music.design = d.id; save(); renderDesigns();
@@ -1049,6 +1100,11 @@ function onDesignClick(e) {
   const id = el.closest('[data-id]').dataset.id, d = findDesign(id); if (!d) return;
   const act = el.dataset.act;
   if (act === 'pick') { selectDesign(d); if (engine.kind !== 'music') toggleMusic(); }
+  else if (act === 'save') {
+    const c = { id: 'd' + Date.now().toString(36), name: d.name, colors: d.colors.slice(), change: d.change, trans: d.trans, fade: d.fade, bright: d.bright, order: d.order };
+    userDesigns.unshift(c); store.set('designs', userDesigns); renderDesigns();
+    toast('"' + d.name + '" tasarımlarına eklendi');
+  }
   else if (act === 'edit') openDesignEditor(d);
   else if (act === 'copy') openDesignEditor(Object.assign({}, d, { id: null, name: d.name + ' (kopya)' }));
   else if (act === 'del') {
@@ -1094,6 +1150,162 @@ function updMicBtn() {
 }
 
 /* ============================================================
+   Kütüphane: renk paletleri × stiller = binlerce animasyon ve müzik tasarımı.
+   Hepsi isteğe göre üretilir; listede yalnızca görünen kartlar çizilir.
+   ============================================================ */
+const PALETTES = (() => {
+  const named = [
+    ['Gün Batımı', '#ff4500 #ff1a66 #9b30ff #ff8c00'], ['Gün Doğumu', '#ff7b00 #ffb347 #ff5e78 #ffd1dc'],
+    ['Okyanus', '#0050ff #00d5ff #0020a0 #00ffb0'], ['Derin Deniz', '#0033cc #0066ff #00ccff'],
+    ['Tropik', '#00ffa2 #ffe600 #ff3d7f #00c3ff'], ['Orman', '#00ff40 #2e8b00 #7dff00 #00a86b'],
+    ['Kuzey Işıkları', '#00ff88 #00c8ff #7a2cff #ff2bd6'], ['Lav', '#ff2000 #ff6a00 #ff0000 #ffae00'],
+    ['Ateş', '#ff3300 #ff7700 #ffaa00'], ['Buzul', '#ffffff #a0e9ff #00bfff #c8f0ff'],
+    ['Neon', '#ff00ff #00ffff #39ff14 #ffff00'], ['Siberpunk', '#ff00a0 #00f0ff #7000ff #ff3c00'],
+    ['Vaporwave', '#ff71ce #01cdfe #05ffa1 #b967ff #fffb96'], ['Pastel', '#ffb3ba #ffdfba #ffffba #baffc9 #bae1ff'],
+    ['Şeker', '#ff69b4 #ff9cee #b28dff #85e3ff'], ['Lavanta', '#9966ff #cc99ff #7a4dff'],
+    ['Gül Bahçesi', '#ff007f #ff4d94 #ff99c2 #c71585'], ['Sevgililer Günü', '#ff0033 #ff3377 #ff99aa'],
+    ['Cadılar Gecesi', '#ff6600 #8800ff #33ff00'], ['Noel', '#ff0000 #00cc00 #ffffff #ffd700'],
+    ['Yılbaşı Işıkları', '#ff0000 #00ff00 #0000ff #ffff00 #ff00ff'], ['Ay Yıldız', '#ff0000 #ffffff'],
+    ['Sarı-Kırmızı', '#ffcc00 #ff0000'], ['Sarı-Lacivert', '#ffdd00 #0022aa'],
+    ['Bordo-Mavi', '#990033 #33ccff'], ['Yeşil-Beyaz', '#00a650 #ffffff'],
+    ['Sıcak Ev', '#ff8c3a #ffb46b #ff6a00'], ['Mum Işığı', '#ff9329 #ffb46b #ff7a00'],
+    ['Sinema', '#00b3b3 #ff8000'], ['Gece Mavisi', '#0000ff #3300cc #000080'],
+    ['Uzay', '#4b0082 #8a2be2 #0000ff #ff00ff'], ['Galaksi', '#6a00ff #ff00d4 #00d4ff'],
+    ['Şafak', '#ff6f61 #ffcc5c #88d8b0'], ['Çöl', '#ffb347 #ff7f50 #ffd27f'],
+    ['Bahar', '#7fff00 #ffb7c5 #ffff66 #00ff7f'], ['Yaz', '#ffd700 #ff4500 #00bfff'],
+    ['Sonbahar', '#ff8c00 #b22222 #ffd700 #cc5500'], ['Kış', '#ffffff #87cefa #4169e1'],
+    ['Gökkuşağı', '#ff0000 #ff8000 #ffff00 #00ff00 #0000ff #8000ff'], ['Limonata', '#ffff00 #ccff00 #ffcc00'],
+    ['Nane', '#00ff99 #66ffcc #00cc88'], ['Böğürtlen', '#8a00ff #ff0066 #4b0082'],
+    ['Şeftali', '#ff9966 #ffcc99 #ff6699'], ['Mercan', '#ff7f50 #ff4f5a #ff9a8b'],
+    ['Zümrüt Şehri', '#00ff80 #00cc66 #66ff00'], ['Kraliyet', '#4000ff #ffd700 #8000ff'],
+    ['Disko', '#ff0000 #00ff00 #0000ff #ffff00 #ff00ff #00ffff'], ['Enerji', '#ff0000 #ff8000 #ffffff'],
+    ['Rahatlama', '#3366ff #6633ff #33ccff'], ['Uyku', '#ff4500 #ff2200 #aa1100'],
+    ['Oyun Modu', '#ff0040 #00ffea #8c00ff'], ['Bulut', '#e0f7ff #b0e0ff #ffffff'],
+    ['Kiraz Çiçeği', '#ffb7c5 #ff69b4 #ffffff'], ['Altın', '#ffd700 #ffb000 #fff0a0'],
+    ['Ay Işığı', '#e6f2ff #b3d9ff #ffffff'], ['Elektrik', '#00ffff #0080ff #ffffff'],
+    ['Zehir', '#39ff14 #ccff00 #00ff66'], ['Gece Kulübü', '#ff00cc #6600ff #00ccff #ff0066'],
+    ['Kutup', '#00ffff #ffffff #0099ff'], ['Volkan', '#ff0000 #ff4400 #ffcc00 #330000'],
+  ].map(([name, c]) => ({ name, colors: c.split(' ') }));
+  // her 15 derecelik ton için 6 renk uyumu kuralı
+  const HUES = ['Kırmızı', 'Domates', 'Turuncu', 'Kehribar', 'Sarı', 'Limon', 'Fıstık', 'Çimen', 'Yeşil', 'Zümrüt', 'Nane', 'Deniz',
+                'Camgöbeği', 'Gök', 'Azur', 'Kobalt', 'Mavi', 'Çivit', 'Mor', 'Ametist', 'Eflatun', 'Fuşya', 'Pembe', 'Gül'];
+  const HARM = [
+    ['Analog', h => [[h - 30, 1, 1], [h, 1, 1], [h + 30, 1, 1]]],
+    ['Tamamlayıcı', h => [[h, 1, 1], [h + 180, 1, 1], [h, 0.55, 1]]],
+    ['Üçlü', h => [[h, 1, 1], [h + 120, 1, 1], [h + 240, 1, 1]]],
+    ['Bölünmüş', h => [[h, 1, 1], [h + 150, 1, 1], [h + 210, 1, 1]]],
+    ['Dörtlü', h => [[h, 1, 1], [h + 90, 1, 1], [h + 180, 1, 1], [h + 270, 1, 1]]],
+    ['Tonları', h => [[h, 1, 1], [h, 0.55, 1], [h, 1, 0.45], [h + 15, 0.85, 1]]],
+  ];
+  const gen = [];
+  HUES.forEach((hn, i) => HARM.forEach(([hk, f]) => gen.push({ name: hn + ' ' + hk, colors: f(i * 15).map(([h, s, v]) => hsvHex(h, s, v)) })));
+  return named.concat(gen);
+})();
+const BLACK = '#000000';
+const dimHex = (c, k) => { const [h, s, v] = hexToHsv(c); return hsvHex(h, s, v * k); };
+const ANIM_STYLES = [
+  { n: 'Yumuşak geçiş', steps: p => p.map(c => [c, 2, 1]) },
+  { n: 'Hızlı geçiş', steps: p => p.map(c => [c, 0.5, 0.15]) },
+  { n: 'Yavaş akış', steps: p => p.map(c => [c, 6, 2]) },
+  { n: 'Atlama', steps: p => p.map(c => [c, 0, 1]) },
+  { n: 'Hızlı atlama', steps: p => p.map(c => [c, 0, 0.22]) },
+  { n: 'Nefes', steps: p => p.flatMap(c => [[c, 1.5, 0.3], [BLACK, 1.5, 0.2]]) },
+  { n: 'Dalga', steps: p => p.flatMap(c => [[c, 1, 0.2], [dimHex(c, 0.25), 1, 0]]) },
+  { n: 'Parıltı', steps: p => p.flatMap(c => [[dimHex(c, 0.35), 0.6, 0.8], [c, 0.08, 0.05], [dimHex(c, 0.35), 0.3, 0.4]]) },
+  { n: 'Kalp atışı', steps: p => p.flatMap(c => [[c, 0.07, 0.05], [dimHex(c, 0.25), 0.15, 0], [c, 0.07, 0.05], [BLACK, 0.45, 0.5]]) },
+  { n: 'Çift flaş', steps: p => p.flatMap(c => [[c, 0, 0.08], [BLACK, 0, 0.1], [c, 0, 0.08], [BLACK, 0, 0.35]]) },
+  { n: 'Stroboskop', steps: p => p.flatMap(c => [[c, 0, 0.05], [BLACK, 0, 0.07], [c, 0, 0.05], [BLACK, 0, 0.07]]) },
+  { n: 'Doğuş', steps: p => [[BLACK, 0, 0.5], ...p.map(c => [c, 3, 0.5]), [BLACK, 3, 0.5]] },
+  { n: 'Titreşim', make: p => () => {
+      const hs = p.map(hexToHsv); let cur = 1, tgt = 1, next = 0, ci = 0, nextC = 2, col = hs[0];
+      return t => {
+        if (t >= next) { tgt = 0.35 + Math.random() * 0.65; next = t + 0.05 + Math.random() * 0.15; }
+        if (t >= nextC) { ci = (ci + 1) % hs.length; nextC = t + 1.5 + Math.random() * 2; }
+        cur += (tgt - cur) * 0.35; col = lerpHsv(col, hs[ci], 0.05);
+        return [col[0], col[1], col[2] * cur];
+      };
+    } },
+  { n: 'Rastgele', make: p => () => {
+      const hs = p.map(hexToHsv); let from = hs[0], to = hs[0], t0 = 0, dur = 1;
+      return t => {
+        if (t >= t0 + dur) {
+          from = to; let j = 0;
+          if (hs.length > 1) do { j = Math.floor(Math.random() * hs.length); } while (hs[j] === to);
+          to = hs[j]; t0 = t; dur = 0.4 + Math.random() * 2;
+        }
+        return lerpHsv(from, to, smoothstep(Math.min(1, (t - t0) / dur)));
+      };
+    } },
+];
+const MUSIC_STYLES = [
+  { n: 'Nabız', d: { change: 4, trans: 'fade', fade: 0.6, bright: 'pulse', order: 'seq' } },
+  { n: 'Her vuruş', d: { change: 1, trans: 'cut', fade: 0.3, bright: 'pulse', order: 'seq' } },
+  { n: 'Vuruş flaşı', d: { change: 1, trans: 'cut', fade: 0.3, bright: 'flash', order: 'seq' } },
+  { n: 'Rastgele flaş', d: { change: 1, trans: 'cut', fade: 0.3, bright: 'flash', order: 'random' } },
+  { n: 'Parti', d: { change: 2, trans: 'fade', fade: 0.2, bright: 'pulse', order: 'seq' } },
+  { n: 'Akış', d: { change: 0, trans: 'fade', fade: 1, bright: 'pulse', order: 'seq' } },
+  { n: 'Sakin', d: { change: 8, trans: 'fade', fade: 1.2, bright: 'pulse', order: 'seq' } },
+  { n: 'Sabit parlak', d: { change: 2, trans: 'fade', fade: 0.3, bright: 'steady', order: 'seq' } },
+  { n: 'Sabit akış', d: { change: 0, trans: 'fade', fade: 1, bright: 'steady', order: 'seq' } },
+];
+function libAnim(pi, si) {
+  const p = PALETTES[pi], st = ANIM_STYLES[si], a = { id: `L${pi}.${si}`, name: `${p.name} · ${st.n}` };
+  if (st.make) { a.make = st.make(p.colors); a.bar = `linear-gradient(90deg, ${p.colors.join(', ')})`; }
+  else a.steps = mk(st.steps(p.colors));
+  return a;
+}
+function libAnimById(id) {
+  const m = /^L(\d+)\.(\d+)$/.exec(id || '');
+  return m && PALETTES[+m[1]] && ANIM_STYLES[+m[2]] ? libAnim(+m[1], +m[2]) : null;
+}
+const libDesignCache = new Map();
+function libDesign(pi, si) {
+  const id = `M${pi}.${si}`;
+  if (!libDesignCache.has(id)) {
+    const p = PALETTES[pi], st = MUSIC_STYLES[si];
+    libDesignCache.set(id, Object.assign({ id, name: `${p.name} · ${st.n}`, colors: p.colors.slice() }, st.d));
+  }
+  return libDesignCache.get(id);
+}
+function libDesignById(id) {
+  const m = /^M(\d+)\.(\d+)$/.exec(id || '');
+  return m && PALETTES[+m[1]] && MUSIC_STYLES[+m[2]] ? libDesign(+m[1], +m[2]) : null;
+}
+// Türkçe karakterleri sadeleştirerek arama ("gun batimi" → "Gün Batımı")
+const fold = s => s.toLocaleLowerCase('tr').replace(/[çğıöşüâî]/g, c => ({ ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u', â: 'a', î: 'i' }[c]));
+function libraryUI(cfg) {
+  const L = { q: '', style: -1, shown: 24, list: [] };
+  const all = [], keys = [];
+  for (let pi = 0; pi < PALETTES.length; pi++) for (let si = 0; si < cfg.styles.length; si++) {
+    all.push([pi, si]); keys.push(fold(PALETTES[pi].name + ' ' + cfg.styles[si].n));
+  }
+  L.total = all.length;
+  L.filter = () => {
+    const words = fold(L.q).split(/\s+/).filter(Boolean);
+    L.list = all.filter(([, si], i) => (L.style < 0 || si === L.style) && words.every(w => keys[i].includes(w)));
+    L.shown = 24; L.render();
+  };
+  L.render = () => {
+    $(cfg.list).innerHTML = L.list.slice(0, L.shown).map(([pi, si]) => cfg.card(cfg.make(pi, si))).join('')
+      || '<div class="muted" style="margin:0 2px 12px">Sonuç bulunamadı.</div>';
+    $(cfg.more).classList.toggle('hidden', L.shown >= L.list.length);
+    $(cfg.count).textContent = L.list.length.toLocaleString('tr') + ' sonuç';
+  };
+  L.random = () => { if (!L.list.length) return null; const [pi, si] = L.list[Math.floor(Math.random() * L.list.length)]; return cfg.make(pi, si); };
+  $(cfg.styleEl).innerHTML = '<button class="chip active" data-s="-1">Hepsi</button>' + cfg.styles.map((s, i) => `<button class="chip" data-s="${i}">${s.n}</button>`).join('');
+  $(cfg.styleEl).addEventListener('click', e => {
+    const b = e.target.closest('[data-s]'); if (!b) return;
+    L.style = +b.dataset.s; $(cfg.styleEl).querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c === b)); L.filter();
+  });
+  let qT; $(cfg.search).addEventListener('input', e => { clearTimeout(qT); qT = setTimeout(() => { L.q = e.target.value; L.filter(); }, 150); });
+  $(cfg.more).addEventListener('click', () => { L.shown += 24; L.render(); });
+  L.filter();
+  return L;
+}
+let animLib = null, musicLib = null;
+musicDesign = findDesign(S.music.design) || MUSIC_BUILTINS[0];
+
+/* ============================================================
    Görüntüye göre renk (telefon kamerası ya da bilgisayarda ekran paylaşımı)
    ============================================================ */
 const cam = {
@@ -1128,14 +1340,25 @@ const cam = {
     $('#vSwatch').style.background = '';
   }
 };
+const VIDEO_FX = [
+  ['follow', 'Takip', 'Şerit ekrandaki rengi yumuşakça takip eder.'],
+  ['palette', 'Ekran paleti', 'Ekrandaki en belirgin 3 rengi bulur ve aralarında yumuşak geçişle döner. Sahne değiştikçe renkler de değişir.'],
+  ['breath', 'Nefes', 'Ekrandaki renkte, nefes alır gibi yavaşça parlayıp söner.'],
+  ['music', 'Müzikle', 'Renk ekrandan, parlaklık sesten gelir: TV\'deki renk müziğin ritmiyle atar. Mikrofon izni de ister.'],
+  ['flash', 'Sahne flaşı', 'Ekrandaki rengi takip eder; sahne aniden değişince kısa bir parlama yapar.'],
+];
+const videoLabel = () => 'Görüntü: ' + (VIDEO_FX.find(f => f[0] === S.video.fx) || VIDEO_FX[0])[1];
 function makeVideoFn() {
-  let cur = null;
-  return () => {
+  let cur = null, slow = null, flash = 0, lastFlash = -9, pos = 0, pal = [], uiT = -1, analyze = null;
+  const NB = 24, bw = new Float32Array(NB), br = new Float32Array(NB), bg2 = new Float32Array(NB), bb = new Float32Array(NB);
+  return (t, dt) => {
     const v = $('#camVideo'), V = S.video;
     if (!cam.stream || v.readyState < 2 || !v.videoWidth) return cur;
     const W = cam.cv.width, H = cam.cv.height, vw = v.videoWidth, vh = v.videoHeight, cw = vw * V.crop, ch = vh * V.crop;
     cam.ctx.drawImage(v, (vw - cw) / 2, (vh - ch) / 2, cw, ch, 0, 0, W, H);
     const d = cam.ctx.getImageData(0, 0, W, H).data;
+    const wantPal = V.fx === 'palette';
+    if (wantPal) { bw.fill(0); br.fill(0); bg2.fill(0); bb.fill(0); }
     let r = 0, g = 0, b = 0, w = 0, lum = 0;
     for (let i = 0; i < d.length; i += 4) {
       const R = d[i], G = d[i + 1], B = d[i + 2], mx = Math.max(R, G, B), mn = Math.min(R, G, B);
@@ -1143,15 +1366,62 @@ function makeVideoFn() {
       // "Canlı renk": doygun ve parlak pikseller çok daha ağır basar
       const wt = V.mode === 'vivid' ? (0.03 + sat * sat) * val * val : 1;
       r += R * wt; g += G * wt; b += B * wt; w += wt; lum += val;
+      // ekran paleti için ton histogramı (24 dilim)
+      if (wantPal && sat > 0.2 && val > 0.12) {
+        const k = Math.floor(rgbToHsv(R, G, B)[0] / 15) % NB, ww = sat * val;
+        bw[k] += ww; br[k] += R * ww; bg2[k] += G * ww; bb[k] += B * ww;
+      }
     }
     lum /= W * H;
     if (!w) return cur;
     const [h, s] = rgbToHsv(r / w, g / w, b / w);
-    const tgt = [h, clamp(s * V.sat, 0, 1), V.follow ? clamp(0.04 + lum * 1.5, 0, 1) : 1];
+    const level = V.follow ? clamp(0.04 + lum * 1.5, 0, 1) : 1;
+    const tgt = [h, clamp(s * V.sat, 0, 1), level];
     cur = cur ? lerpHsv(cur, tgt, 0.06 + (1 - V.smooth) * 0.6) : tgt;
-    $('#vSwatch').style.background = hsvHex(cur[0], cur[1], Math.max(0.15, cur[2]));
-    return cur;
+    slow = slow ? lerpHsv(slow, tgt, 0.12) : tgt;
+    let out = cur;
+    if (wantPal) {
+      // birbirine yakın olmayan en güçlü 3 ton grubu
+      const order = Array.from({ length: NB }, (_, i) => i).sort((x, y) => bw[y] - bw[x]);
+      const picked = [];
+      for (const i of order) {
+        if (bw[i] <= 0 || bw[i] < bw[order[0]] * 0.06) break;
+        if (picked.every(j => Math.min(Math.abs(i - j), NB - Math.abs(i - j)) >= 2)) picked.push(i);
+        if (picked.length === 3) break;
+      }
+      let cols = picked.map(i => { const [ph, ps] = rgbToHsv(br[i] / bw[i], bg2[i] / bw[i], bb[i] / bw[i]); return [ph, clamp(ps * V.sat, 0, 1), level]; });
+      if (!cols.length) cols = [tgt];
+      cols.sort((x, y) => x[0] - y[0]);
+      pal = cols.map((c, i) => pal[i] ? lerpHsv(pal[i], c, 0.08) : c);
+      const n = pal.length;
+      pos = (pos + dt / 2.5) % n;            // her renk ~2,5 sn: yarısı bekleme, yarısı geçiş
+      const i = Math.floor(pos), f = pos - i;
+      out = n > 1 ? lerpHsv(pal[i], pal[(i + 1) % n], smoothstep(clamp((f - 0.5) * 2, 0, 1))) : pal[0];
+    } else if (V.fx === 'breath') {
+      out = [cur[0], cur[1], cur[2] * (0.12 + 0.88 * (0.5 - 0.5 * Math.cos(t * Math.PI / 2)))];
+    } else if (V.fx === 'music') {
+      if (!analyze) analyze = makeAnalyzer();
+      const A = analyze(), fl = S.music.floor;
+      out = [cur[0], cur[1], cur[2] * (A ? fl + (1 - fl) * A.env : 1)];
+    } else if (V.fx === 'flash') {
+      const dh = Math.abs(((tgt[0] - slow[0] + 540) % 360) - 180);
+      if (tgt[1] > 0.3 && dh > 50 && t - lastFlash > 0.8) { flash = 1; lastFlash = t; slow = tgt; }
+      out = [cur[0], cur[1] * (1 - 0.6 * flash), Math.min(1, cur[2] + flash)];
+      flash *= 0.85;
+    }
+    if (t - uiT > 0.15) {
+      uiT = t;
+      $('#vSwatch').style.background = hsvHex(out[0], out[1], Math.max(0.15, out[2]));
+      const dots = $('#vPal').children;
+      for (let j = 0; j < 3; j++) dots[j].style.background = wantPal && pal[j] ? hsvHex(pal[j][0], pal[j][1], 1) : 'transparent';
+    }
+    return out;
   };
+}
+// "Müzikle" efekti için mikrofon; izin verilmezse efekt sessizce sabit parlaklıkla sürer
+async function openVideoMic() {
+  if (audio.an) return;
+  try { await audio.open('mic'); } catch (e) { audio.close(); toast('"Müzikle" için mikrofon gerekli: ' + micErr(e), 5000); }
 }
 async function toggleVideo() {
   if (engine.kind === 'video') { engine.stop(); return; }
@@ -1163,8 +1433,9 @@ async function toggleVideo() {
     toast(e.name === 'NotAllowedError' ? 'Kamera / ekran izni verilmedi.' : (e.message || String(e)), 5500);
     return;
   }
+  if (S.video.fx === 'music') await openVideoMic();
   btn.disabled = false;
-  engine.run('video', S.video.src === 'screen' ? 'Görüntü: ekran' : 'Görüntü: kamera', makeVideoFn(), () => { cam.close(); updCamBtn(); });
+  engine.run('video', videoLabel(), makeVideoFn(), () => { cam.close(); audio.close(); updCamBtn(); });
   updCamBtn();
 }
 function updCamBtn() {
@@ -1330,6 +1601,10 @@ function init() {
   $('#userAnims').addEventListener('click', onAnimClick);
   $('#builtinAnims').addEventListener('click', onAnimClick);
   $('#newAnim').addEventListener('click', () => openEditor(null));
+  animLib = libraryUI({ styles: ANIM_STYLES, make: libAnim, card: a => animCard(a, 'lib'),
+    list: '#alList', more: '#alMore', count: '#alCount', search: '#alSearch', styleEl: '#alStyles' });
+  $('#alList').addEventListener('click', onAnimClick);
+  $('#alRandom').addEventListener('click', () => { const a = animLib.random(); if (a) { playAnim(a); toast('🎲 ' + a.name); } });
   $('#edName').addEventListener('input', e => { edit.name = e.target.value; });
   const onStepInput = e => {
     const row = e.target.closest('.step'); if (!row || !e.target.dataset.k) return;
@@ -1376,6 +1651,13 @@ function init() {
   renderDesigns();
   $('#mDesigns').addEventListener('click', onDesignClick);
   $('#mNew').addEventListener('click', () => openDesignEditor(null));
+  musicLib = libraryUI({ styles: MUSIC_STYLES, make: libDesign, card: d => designCard(d, 'lib'),
+    list: '#mlList', more: '#mlMore', count: '#mlCount', search: '#mlSearch', styleEl: '#mlStyles' });
+  $('#mlList').addEventListener('click', onDesignClick);
+  $('#mlRandom').addEventListener('click', () => {
+    const d = musicLib.random(); if (!d) return;
+    selectDesign(d); if (engine.kind !== 'music') toggleMusic(); toast('🎲 ' + d.name);
+  });
   $('#mdName').addEventListener('input', e => { dEdit.name = e.target.value; if (musicDesign === dEdit && engine.kind === 'music') setNow(musicLabel()); });
   // Android'in renk seçicisi bazen yalnızca "change" gönderir; ikisini de dinle
   const onDesignColor = e => { if (e.target.dataset.i != null) dEdit.colors[+e.target.dataset.i] = e.target.value; };
@@ -1414,6 +1696,18 @@ function init() {
 
   // görüntü
   $('#camBtn').addEventListener('click', toggleVideo);
+  if (!VIDEO_FX.some(f => f[0] === S.video.fx)) S.video.fx = 'follow';
+  const renderVFx = () => {
+    document.querySelectorAll('#vFx .chip').forEach(c => c.classList.toggle('active', c.dataset.v === S.video.fx));
+    $('#vFxDesc').textContent = (VIDEO_FX.find(f => f[0] === S.video.fx) || VIDEO_FX[0])[2];
+    $('#vPal').classList.toggle('hidden', S.video.fx !== 'palette');
+  };
+  $('#vFx').addEventListener('click', async e => {
+    const c = e.target.closest('[data-v]'); if (!c) return;
+    S.video.fx = c.dataset.v; save(); renderVFx();
+    if (engine.kind === 'video') { setNow(videoLabel()); if (S.video.fx === 'music') await openVideoMic(); else audio.close(); }
+  });
+  renderVFx();
   $('#camSrc').value = S.video.src;
   $('#camSrc').addEventListener('change', e => { S.video.src = e.target.value; save(); if (engine.kind === 'video') { engine.stop(); toggleVideo(); } });
   const renderVMode = () => document.querySelectorAll('#vMode .chip').forEach(c => c.classList.toggle('active', c.dataset.v === S.video.mode));
