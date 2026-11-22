@@ -212,6 +212,12 @@ ol.help li{margin:3px 0}
   <!-- MÜZİK -->
   <section class="tab" id="tab-music">
     <div class="card">
+      <div class="row between" style="gap:12px">
+        <div><b>Şeridin kendi mikrofonu</b><div class="muted">Telefonu kapatsan da şerit müziği kendisi dinler.</div></div>
+        <button class="btn sm primary" id="devMicBtn">Aç</button>
+      </div>
+    </div>
+    <div class="card">
       <canvas id="viz"></canvas>
       <button class="btn primary" id="micBtn" style="width:100%;margin-top:12px">Dinlemeyi başlat</button>
       <div class="row" style="margin-top:10px">
@@ -321,6 +327,9 @@ ol.help li{margin:3px 0}
       <div class="row between"><span>Yön</span>
         <div class="chips" id="fxDir"><button class="chip" data-dir="1">İleri</button><button class="chip" data-dir="0">Geri</button></div></div>
       <p class="muted">Bunlar şeridin kendi içindeki hazır efektler (MR STAR'dakilerle aynı). Şerit kendi çalıştırır, telefonun açık kalması gerekmez.</p>
+      <label class="sl hidden" id="fxSpeedWrap" style="margin-top:14px"><div class="row"><span>Efekt hızı</span><output id="fxSpeedOut"></output></div>
+        <input type="range" id="fxSpeed" min="1" max="100"></label>
+      <button class="btn sm" id="fxSpeedFind" style="margin-top:12px">Hız ayarını bul</button>
     </div>
     <div id="fxList"></div>
   </section>
@@ -356,6 +365,13 @@ ol.help li{margin:3px 0}
           <button class="chip" data-c="R">🔴 Kırmızı</button><button class="chip" data-c="G">🟢 Yeşil</button><button class="chip" data-c="B">🔵 Mavi</button>
         </div>
       </div>
+    </div>
+    <div class="card" id="finderCard">
+      <h2>Komut bulucu</h2>
+      <p class="muted" style="margin:0 0 10px">MR STAR'daki bazı özelliklerin komutunu, olası komutları sırayla deneyerek bulur. Bilinmeyen komutlar denendiği için şeritte geçici tuhaflıklar olabilir; bir renk seçmek ya da fişi çekip takmak düzeltir.</p>
+      <div class="chips" id="finderTarget"><button class="chip" data-t="mic">Harici mikrofon</button><button class="chip" data-t="speed">Efekt hızı</button></div>
+      <p class="muted" id="finderHint"></p>
+      <div id="finderBody"></div>
     </div>
     <div class="card">
       <h2>İnce ayar</h2>
@@ -449,7 +465,7 @@ const smoothstep = x => x * x * (3 - 2 * x);
    Ayarlar (tarayıcıda saklanır)
    ============================================================ */
 const DEF = {
-  master: 80, speed: 0, gap: 30, minRaw: 10, hsv: [275, 0.85, 1], tab: 'color', fxDir: 1, order: 'RGB',
+  master: 80, speed: 0, gap: 30, minRaw: 10, hsv: [275, 0.85, 1], tab: 'color', fxDir: 1, order: 'RGB', found: {}, fxSpeed: 50,
   music: { design: 'm-pulse', src: 'mic', sens: 1, smooth: 0.5, floor: 0.05 },
   video: { src: 'camera', mode: 'vivid', sat: 1.4, smooth: 0.5, crop: 0.7, follow: true, fx: 'follow' }
 };
@@ -1472,6 +1488,148 @@ function playFx(code, name) {
   if (led.needOn || !led.power) led.setPower(true);
   ble.send('fx', P.effect(code));
   ble.send('dir', P.dir(S.fxDir));
+  sendFxSpeed();
+}
+// komut bulucuyla bulunan hız komutu: şablonun sondan ikinci baytı hız değeridir
+function sendFxSpeed() {
+  const t = S.found.speed; if (!t) return;
+  const b = t.slice(); b[b.length - 2] = clamp(Math.round(S.fxSpeed), 1, 100); ble.send('speed', b);
+}
+
+/* ============================================================
+   Komut bulucu: MR STAR'daki belgelenmemiş komutları deneme yoluyla bulur.
+   Olası komutlar sırayla gönderilir; kullanıcı şeritte beklenen değişikliği görünce
+   "Bu!"ya basar, sihirbaz son iki adayı tek tek tekrar deneyip doğrular.
+   ============================================================ */
+let finderScale = 1; // testte bekleme sürelerini kısaltmak için
+const FIND_CMDS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 2, 3];
+const FINDER = {
+  mic: {
+    name: 'Harici mikrofon',
+    hint: 'TV\'de müzik aç, sesi biraz yüksek olsun. Sihirbaz şeride sırayla olası komutlar gönderecek (her biri ~4 sn). Şerit müziğin ritmiyle yanıp sönmeye başladığı an "Bu!"ya bas. Toplam ~2,5 dakika sürer.',
+    yes: 'Bu! Müziğe tepki veriyor',
+    ask: 'Şerit şimdi müziğe tepki veriyor mu?',
+    done: 'Müzik sekmesindeki "Şeridin kendi mikrofonu" düğmesi artık bu komutu kullanıyor. Şerit şu an zaten mikrofon modunda.',
+    none: 'Bu kumandanın komutu farklı bir biçimde olabilir. Telefonsuz müzik için MR STAR\'dan harici mikrofonu seçmeye devam edebilirsin.',
+    baseline() { led.invalidate(); led.show(275, 0.9, 1); },
+    cands() {
+      const c = [[6, 2, 1, 0], [6, 2, 1, 1], [6, 2, 2, 0], [6, 2, 2, 1], [6, 2, 3, 0]];
+      for (const cmd of FIND_CMDS) for (const v of [1, 2]) c.push([cmd, 1, v]);
+      return c.map(x => [0xBC, ...x, 0x55]);
+    }
+  },
+  speed: {
+    name: 'Efekt hızı',
+    hint: 'Şeritte "7 renk akan su" efekti çalışacak, arada olası hız komutları denenecek (her biri ~4 sn). Efekt belirgin şekilde yavaşlayınca ya da hızlanınca "Bu!"ya bas. Toplam ~1,5 dakika sürer.',
+    yes: 'Bu! Hızı değişti',
+    ask: 'Efektin hızı şimdi belirgin şekilde değişti mi?',
+    done: 'Efektler sekmesine hız ayarı eklendi.',
+    none: 'Hız ayarı için MR STAR\'ı kullanmaya devam edebilirsin.',
+    baseline() { if (led.needOn || !led.power) led.setPower(true); ble.send('fx', P.effect(0x37)); ble.send('dir', P.dir(1)); led.invalidate(); paintSpecial('fx'); },
+    cands() {
+      const c = FIND_CMDS.map(cmd => [cmd, 1, 5]);
+      for (const cmd of [8, 9, 10]) c.push([cmd, 2, 0, 5]);
+      return c.map(x => [0xBC, ...x, 0x55]);
+    }
+  }
+};
+const finder = {
+  target: 'mic', state: 'idle', i: 0, list: [], token: 0, paused: false, conf: null, lastSent: -1,
+  T() { return FINDER[this.target]; },
+  start() {
+    if (!ble.ok) { toast('Önce şeride bağlan.'); return; }
+    const T = this.T();
+    engine.run('fx', 'Komut bulucu: ' + T.name, null, () => this.cancel());
+    this.list = T.cands(); this.i = 0; this.lastSent = -1; this.paused = false; this.conf = null;
+    this.state = 'run'; const tok = ++this.token;
+    wake.on(); // tarama sürerken ekran kapanıp sayfa durmasın
+    if (led.needOn || !led.power) led.setPower(true);
+    this.render(); this.loop(tok);
+  },
+  async loop(tok) {
+    const T = this.T(), alive = () => tok === this.token && this.state === 'run';
+    while (alive() && this.i < this.list.length) {
+      if (this.paused) { await sleep(200); continue; }
+      T.baseline(); await sleep(900 * finderScale); if (!alive()) return;
+      if (this.paused) continue;
+      ble.send('find', this.list[this.i]); this.lastSent = this.i; this.render();
+      await sleep(2800 * finderScale); if (!alive()) return;
+      if (!this.paused) this.i++;
+    }
+    if (alive()) { this.state = 'none'; T.baseline(); engine.stop(); this.render(); }
+  },
+  hit() {
+    if (this.state !== 'run' || this.lastSent < 0) return;
+    ++this.token;   // taramayı durdur
+    // kullanıcı geç basmış olabilir: önce son gönderilen, sonra bir öncekini dene
+    this.conf = { idxs: [this.lastSent, this.lastSent - 1].filter(k => k >= 0), k: 0 };
+    this.tryConfirm();
+  },
+  async tryConfirm() {
+    const T = this.T(), tok = ++this.token, idx = this.conf.idxs[this.conf.k];
+    this.state = 'confirm'; this.render();
+    T.baseline(); await sleep(900 * finderScale); if (tok !== this.token) return;
+    ble.send('find', this.list[idx]);
+  },
+  answer(yes) {
+    if (this.state !== 'confirm') return;
+    const c = this.conf, idx = c.idxs[c.k];
+    if (yes) { this.found(idx); return; }
+    if (++c.k < c.idxs.length) { this.tryConfirm(); return; }
+    // ikisi de değilmiş: taramaya kaldığı yerden devam
+    this.conf = null; this.state = 'run'; this.i = c.idxs[0] + 1; this.render(); this.loop(++this.token);
+  },
+  found(idx) {
+    const target = this.target, bytes = this.list[idx];
+    S.found = Object.assign({}, S.found, { [target]: bytes }); save();
+    this.state = 'found'; this.conf = null; ++this.token;
+    engine.run('fx', target === 'mic' ? 'Şeridin mikrofonu' : 'Efekt: Akan su · 7 renk', null, () => led.invalidate());
+    if (target === 'speed') S.fxSpeed = 5;
+    updFoundUI(); this.render();
+    toast('Komut bulundu: ' + hexStr(bytes), 5000);
+  },
+  cancel() {
+    if (this.state === 'run' || this.state === 'confirm') this.state = 'idle';
+    this.conf = null; this.paused = false; ++this.token; this.render();
+  },
+  render() {
+    const T = this.T(), b = $('#finderBody'), saved = S.found[this.target], busy = this.state === 'run' || this.state === 'confirm';
+    const code = x => `<code style="font-family:ui-monospace,Consolas,monospace">${hexStr(x || [])}</code>`;
+    $('#finderHint').textContent = T.hint;
+    document.querySelectorAll('#finderTarget .chip').forEach(c => { c.classList.toggle('active', c.dataset.t === this.target); c.disabled = busy; });
+    if (this.state === 'run') {
+      const n = this.list.length, cur = Math.min(this.i, n - 1), pct = Math.round(this.i / n * 100);
+      b.innerHTML = `<div class="muted">Aday ${cur + 1} / ${n} · ${code(this.list[cur])}</div>
+        <div style="height:6px;background:#0f131b;border-radius:3px;margin:8px 0 12px"><div style="height:6px;width:${pct}%;background:var(--accent);border-radius:3px"></div></div>
+        <button class="btn primary" data-f="hit" style="width:100%;min-height:58px;font-size:16px">✅ ${T.yes}</button>
+        <div class="row" style="margin-top:10px"><button class="btn sm" data-f="pause">${this.paused ? '▶ Devam' : '⏸ Duraklat'}</button><span class="grow"></span><button class="btn sm danger" data-f="stop">Durdur</button></div>`;
+    } else if (this.state === 'confirm') {
+      const c = this.conf, idx = c.idxs[c.k];
+      b.innerHTML = `<p style="margin:0 0 8px">Emin olmak için tek tek deniyorum (${c.k + 1}/${c.idxs.length}): ${code(this.list[idx])}</p>
+        <p style="margin:0 0 10px"><b>${T.ask}</b></p>
+        <div class="row"><button class="btn primary grow" data-f="yes">Evet</button><button class="btn grow" data-f="no">Hayır</button></div>`;
+    } else if (this.state === 'found') {
+      b.innerHTML = `<div class="note" style="border-color:rgba(52,211,153,.45);background:rgba(52,211,153,.08)">✅ Bulundu: ${code(saved)}<br>${T.done}<br><span class="muted">Bu kodu bana yazarsan uygulamaya kalıcı olarak eklerim.</span></div>
+        <button class="btn sm" data-f="start">Yeniden ara</button>`;
+    } else if (this.state === 'none') {
+      b.innerHTML = `<div class="note warn">Hiçbir aday işe yaramadı. ${T.none}</div><button class="btn sm" data-f="start">Tekrar dene</button>`;
+    } else {
+      b.innerHTML = (saved ? `<p class="muted" style="margin:0 0 10px">Kayıtlı komut: ${code(saved)}</p>` : '')
+        + `<button class="btn primary" data-f="start">${saved ? 'Yeniden ara' : 'Başlat'}</button>`;
+    }
+  }
+};
+function updFoundUI() {
+  $('#devMicBtn').textContent = S.found.mic ? 'Aç' : 'Komutu bul';
+  $('#fxSpeedWrap').classList.toggle('hidden', !S.found.speed);
+  $('#fxSpeedFind').classList.toggle('hidden', !!S.found.speed);
+  $('#fxSpeed').value = S.fxSpeed; $('#fxSpeedOut').textContent = S.fxSpeed;
+}
+function openFinder(target, msg) {
+  if (finder.state === 'run' || finder.state === 'confirm') engine.stop();
+  finder.target = target; finder.state = 'idle'; setTab('set'); finder.render();
+  $('#finderCard').scrollIntoView({ block: 'start' }); window.scrollBy(0, -70);
+  if (msg) toast(msg, 4000);
 }
 
 /* ============================================================
@@ -1719,6 +1877,36 @@ function init() {
   updCrop();
   $('#vFollow').checked = S.video.follow;
   $('#vFollow').addEventListener('change', e => { S.video.follow = e.target.checked; save(); });
+
+  // komut bulucu, şeridin mikrofonu, efekt hızı
+  if (!S.found || typeof S.found !== 'object') S.found = {};
+  for (const k of Object.keys(S.found)) if (!Array.isArray(S.found[k]) || !S.found[k].every(x => Number.isInteger(x) && x >= 0 && x < 256)) delete S.found[k];
+  $('#finderTarget').addEventListener('click', e => {
+    const c = e.target.closest('[data-t]'); if (!c || c.disabled) return;
+    finder.target = c.dataset.t; finder.state = 'idle'; finder.render();
+  });
+  $('#finderBody').addEventListener('click', e => {
+    const b = e.target.closest('[data-f]'); if (!b) return;
+    const f = b.dataset.f;
+    if (f === 'start') finder.start();
+    else if (f === 'hit') finder.hit();
+    else if (f === 'pause') { finder.paused = !finder.paused; finder.render(); }
+    else if (f === 'stop') { engine.stop(); applyManual(); }
+    else if (f === 'yes') finder.answer(true);
+    else if (f === 'no') finder.answer(false);
+  });
+  $('#devMicBtn').addEventListener('click', () => {
+    const cmd = S.found.mic;
+    if (!cmd) { openFinder('mic', 'Önce şeridin mikrofon komutunu bulalım: TV\'de müzik aç ve Başlat\'a bas.'); return; }
+    if (!ble.ok) { toast('Önce şeride bağlan.'); return; }
+    engine.run('fx', 'Şeridin mikrofonu', null, () => led.invalidate());
+    if (led.needOn || !led.power) led.setPower(true);
+    ble.send('devmic', cmd); paintSpecial('fx');
+    toast('Şerit artık müziği kendisi dinliyor. Uygulamayı kapatabilirsin.', 4000);
+  });
+  $('#fxSpeedFind').addEventListener('click', () => openFinder('speed', 'Şeride bağlıyken Başlat\'a bas ve efekti izle.'));
+  bindRange('fxSpeed', 'fxSpeedOut', () => S.fxSpeed, v => { S.fxSpeed = v; sendFxSpeed(); }, v => String(v));
+  updFoundUI(); finder.render();
 
   // efektler
   renderFx();
